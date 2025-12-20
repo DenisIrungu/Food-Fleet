@@ -3,14 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class RestaurantModel {
   final String id;
   final String name;
-  final String adminUid;        // Links to the restaurant admin user
+  final String adminUid;
   final String email;
   final String phone;
   final String address;
   final List<String> cuisineTypes;
   final String? description;
   final String? imageUrl;
-  final String status;          // 'active' or 'inactive'
+  final String status; // 'active' or 'inactive'
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -29,10 +29,9 @@ class RestaurantModel {
     required this.updatedAt,
   });
 
-  // Create RestaurantModel from Firestore document
+  /// Create RestaurantModel from Firestore document
   factory RestaurantModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    
+    final data = doc.data() as Map<String, dynamic>? ?? {};
     return RestaurantModel(
       id: doc.id,
       name: data['name'] ?? '',
@@ -44,12 +43,16 @@ class RestaurantModel {
       description: data['description'],
       imageUrl: data['imageUrl'],
       status: data['status'] ?? 'active',
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp).toDate(),
+      createdAt: (data['createdAt'] is Timestamp)
+          ? (data['createdAt'] as Timestamp).toDate()
+          : DateTime.now(),
+      updatedAt: (data['updatedAt'] is Timestamp)
+          ? (data['updatedAt'] as Timestamp).toDate()
+          : DateTime.now(),
     );
   }
 
-  // Convert RestaurantModel to Map for Firestore
+  /// Convert RestaurantModel to Firestore map
   Map<String, dynamic> toMap() {
     return {
       'name': name,
@@ -66,7 +69,7 @@ class RestaurantModel {
     };
   }
 
-  // Create a copy with updated fields
+  /// Copy with updated fields
   RestaurantModel copyWith({
     String? name,
     String? phone,

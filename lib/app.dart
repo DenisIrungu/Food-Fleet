@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:foodfleet/Theme/theme_provider.dart';
 import 'appView.dart';
-import 'services/auth_service.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});

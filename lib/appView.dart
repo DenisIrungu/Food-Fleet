@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:foodfleet/Theme/theme_provider.dart';
+import 'package:foodfleet/screens/dashboards/admin/restaurant_dashboard.dart';
+import 'package:foodfleet/screens/dashboards/super_admin/change_password.dart';
+import 'package:foodfleet/screens/dashboards/super_admin/create_admin.dart';
 import 'package:foodfleet/screens/splashscreens/splashscreen1.dart';
 import 'package:foodfleet/services/database_service.dart';
 import 'package:provider/provider.dart';
@@ -23,24 +26,24 @@ class AppView extends StatelessWidget {
     return MaterialApp(
       title: APP_NAME,
       debugShowCheckedModeBanner: false,
-      theme: themeProvider.themeData, 
-      
+      theme: themeProvider.themeData,
+
       // Initial route
       initialRoute: SPLASH_ROUTE,
-      
+
       // Define all routes
       routes: {
         SPLASH_ROUTE: (context) => const AuthWrapper(),
         LOGIN_ROUTE: (context) => const LoginScreen(),
-         REGISTER_ROUTE: (context) => SignUp(
-  onTap: () {
-    Navigator.pushNamed(context, LOGIN_ROUTE); // Navigate to login screen when tapped
-  },
-),
-
-        // CHANGE_PASSWORD_ROUTE: (context) => const ChangePasswordScreen(),
-         SUPER_ADMIN_DASHBOARD_ROUTE: (context) => const SuperAdminDashboard(),
-        // RESTAURANT_DASHBOARD_ROUTE: (context) => const RestaurantDashboard(),
+        REGISTER_ROUTE: (context) => SignUp(
+              onTap: () {
+                Navigator.pushNamed(context, LOGIN_ROUTE);
+              },
+            ),
+        CHANGE_PASSWORD_ROUTE: (context) => const ChangePasswordScreen(),
+        SUPER_ADMIN_DASHBOARD_ROUTE: (context) => const SuperAdminDashboard(),
+        CREATE_ADMIN: (context) => const CreateAdmin(),
+        RESTAURANT_DASHBOARD_ROUTE: (context) => const RestaurantDashboard(),
         // RIDER_DASHBOARD_ROUTE: (context) => const RiderDashboard(),
         // CUSTOMER_DASHBOARD_ROUTE: (context) => const CustomerDashboard(),
       },
@@ -59,7 +62,7 @@ class AuthWrapper extends StatelessWidget {
 
     // If no user is logged in, show splash screen
     if (firebaseUser == null) {
-      return  SplashScreen();
+      return const SplashScreen();
     }
 
     // User is logged in, fetch their data and navigate to appropriate dashboard
@@ -71,9 +74,7 @@ class AuthWrapper extends StatelessWidget {
           return Scaffold(
             backgroundColor: Theme.of(context).colorScheme.surface,
             body: const Center(
-              child: CircularProgressIndicator(
-                color: Colors.white,
-              ),
+              child: CircularProgressIndicator(color: Colors.white),
             ),
           );
         }
@@ -85,10 +86,10 @@ class AuthWrapper extends StatelessWidget {
 
         final user = snapshot.data!;
 
-        // Check if first login - force password change
-        // if (user.firstLogin) {
-        //   return const ChangePasswordScreen();
-        // }
+        // Force password change ONLY for restaurant admins on first login
+        if (user.role == ROLE_RESTAURANT_ADMIN && user.firstLogin) {
+          return const ChangePasswordScreen();
+        }
 
         // Navigate based on role
         return _getDashboardForRole(user.role);
@@ -101,8 +102,8 @@ class AuthWrapper extends StatelessWidget {
     switch (role) {
       case ROLE_SUPER_ADMIN:
         return const SuperAdminDashboard();
-      // case ROLE_RESTAURANT_ADMIN:
-      //   return const RestaurantDashboard();
+      case ROLE_RESTAURANT_ADMIN:
+        return const RestaurantDashboard();
       // case ROLE_RIDER:
       //   return const RiderDashboard();
       // case ROLE_CUSTOMER:

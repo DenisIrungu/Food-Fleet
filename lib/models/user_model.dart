@@ -5,10 +5,10 @@ class UserModel {
   final String email;
   final String role; // 'super_admin', 'restaurant_admin', 'rider', 'customer'
   final String? restaurantId; // For restaurant admins and riders
-  final String? restaurantName; // Display name for restaurant
-  final String? riderName; // For riders
-  final String? customerName; // For customers
-  final bool firstLogin; // Force password change on first login
+  final String? restaurantName; // For restaurant admins & riders
+  final String? fullName; // Used for rider or customer display name
+  final String? phone; // New field for phone number
+  final bool firstLogin; // For password reset requirement
   final DateTime createdAt;
 
   UserModel({
@@ -17,38 +17,37 @@ class UserModel {
     required this.role,
     this.restaurantId,
     this.restaurantName,
-    this.riderName,
-    this.customerName,
+    this.fullName,
+    this.phone,
     required this.firstLogin,
     required this.createdAt,
   });
 
   // Create UserModel from Firestore document
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    
+    final data = doc.data() as Map<String, dynamic>;
     return UserModel(
       uid: doc.id,
       email: data['email'] ?? '',
       role: data['role'] ?? '',
       restaurantId: data['restaurantId'],
       restaurantName: data['restaurantName'],
-      riderName: data['riderName'],
-      customerName: data['customerName'],
+      fullName: data['fullName'],
+      phone: data['phone'],
       firstLogin: data['firstLogin'] ?? false,
       createdAt: (data['createdAt'] as Timestamp).toDate(),
     );
   }
 
-  // Convert UserModel to Map for Firestore
+  // Convert UserModel to Firestore map
   Map<String, dynamic> toMap() {
     return {
       'email': email,
       'role': role,
       'restaurantId': restaurantId,
       'restaurantName': restaurantName,
-      'riderName': riderName,
-      'customerName': customerName,
+      'fullName': fullName,
+      'phone': phone,
       'firstLogin': firstLogin,
       'createdAt': Timestamp.fromDate(createdAt),
     };
@@ -60,11 +59,11 @@ class UserModel {
       case 'super_admin':
         return 'Super Admin';
       case 'restaurant_admin':
-        return restaurantName ?? 'Restaurant';
+        return restaurantName ?? 'Restaurant Admin';
       case 'rider':
-        return riderName ?? 'Rider';
+        return fullName ?? 'Rider';
       case 'customer':
-        return customerName ?? 'Customer';
+        return fullName ?? 'Customer';
       default:
         return 'User';
     }
@@ -77,8 +76,8 @@ class UserModel {
     String? role,
     String? restaurantId,
     String? restaurantName,
-    String? riderName,
-    String? customerName,
+    String? fullName,
+    String? phone,
     bool? firstLogin,
     DateTime? createdAt,
   }) {
@@ -88,8 +87,8 @@ class UserModel {
       role: role ?? this.role,
       restaurantId: restaurantId ?? this.restaurantId,
       restaurantName: restaurantName ?? this.restaurantName,
-      riderName: riderName ?? this.riderName,
-      customerName: customerName ?? this.customerName,
+      fullName: fullName ?? this.fullName,
+      phone: phone ?? this.phone,
       firstLogin: firstLogin ?? this.firstLogin,
       createdAt: createdAt ?? this.createdAt,
     );

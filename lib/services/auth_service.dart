@@ -3,80 +3,76 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:foodfleet/models/user_model.dart';
 import 'package:foodfleet/services/database_service.dart';
 import '/utils/constants.dart';
-import '/firebase_options.dart'; // Make sure this file exists (from flutterfire configure)
+import '/firebase_options.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final DatabaseService _databaseService = DatabaseService();
 
-  // ✅ Get the current authenticated user
+  // ✅ Current authenticated user
   User? get currentUser => _auth.currentUser;
 
-  // ✅ Auth state changes stream
+  // ✅ Auth state changes
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  // ✅ Sign in with email and password
+  // =====================================
+  // SIGN IN
+  // =====================================
   Future<UserModel?> signIn(String email, String password) async {
     try {
-      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+      final userCredential = await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
 
-      if (userCredential.user != null) {
-        return await _databaseService.getUserData(userCredential.user!.uid);
-      }
-      return null;
+      return userCredential.user == null
+          ? null
+          : await _databaseService.getUserData(userCredential.user!.uid);
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
-    } catch (e) {
-      throw 'An error occurred. Please try again.';
     }
   }
 
-  // ✅ Sign out
+  // =====================================
+  // SIGN OUT
+  // =====================================
   Future<void> signOut() async {
-    try {
-      await _auth.signOut();
-    } catch (e) {
-      throw 'Failed to sign out. Please try again.';
-    }
+    await _auth.signOut();
   }
 
-  // ✅ Register Customer (Self Registration)
+  // =====================================
+  // CUSTOMER REGISTRATION
+  // =====================================
   Future<UserModel?> registerCustomer({
     required String email,
     required String password,
     required String name,
   }) async {
     try {
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+      final credential = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
 
-      if (userCredential.user != null) {
-        UserModel newUser = UserModel(
-          uid: userCredential.user!.uid,
-          email: email.trim(),
-          role: ROLE_CUSTOMER,
-          customerName: name,
-          firstLogin: false,
-          createdAt: DateTime.now(),
-        );
+      final user = UserModel(
+        uid: credential.user!.uid,
+        email: email.trim(),
+        role: ROLE_CUSTOMER,
+        fullName: name,
+        firstLogin: false,
+        createdAt: DateTime.now(),
+      );
 
-        await _databaseService.addUser(newUser);
-        return newUser;
-      }
-      return null;
+      await _databaseService.addUser(user);
+      return user;
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
-    } catch (e) {
-      throw 'Failed to create account. Please try again.';
     }
   }
 
-  // ✅ Create Restaurant Admin (without logging out Super Admin)
+  // =====================================
+  // CREATE RESTAURANT ADMIN (BY SUPER ADMIN)
+  // =====================================
   Future<UserModel?> createRestaurantAdmin({
     required String email,
     required String password,
@@ -84,66 +80,61 @@ class AuthService {
     required String restaurantName,
   }) async {
     try {
-      // Initialize a temporary Firebase app
-      FirebaseApp tempApp = await Firebase.initializeApp(
-        name: 'TempRestaurantApp',
+      final tempApp = await Firebase.initializeApp(
+        name: 'TempRestaurantAdminApp',
         options: DefaultFirebaseOptions.currentPlatform,
       );
 
-      FirebaseAuth tempAuth = FirebaseAuth.instanceFor(app: tempApp);
+      final tempAuth = FirebaseAuth.instanceFor(app: tempApp);
 
-      // Create restaurant admin account on temporary app
-      UserCredential userCredential = await tempAuth.createUserWithEmailAndPassword(
+      final credential = await tempAuth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
 
-      // Build new restaurant admin user model
-      UserModel newUser = UserModel(
-        uid: userCredential.user!.uid,
+      // 🔹 Set firstLogin = true for enforcement
+      final adminUser = UserModel(
+        uid: credential.user!.uid,
         email: email.trim(),
         role: ROLE_RESTAURANT_ADMIN,
         restaurantId: restaurantId,
         restaurantName: restaurantName,
-        firstLogin: true,
+        firstLogin: true, // ✅ enforce password change on first login
         createdAt: DateTime.now(),
       );
 
-      // Save to Firestore
-      await _databaseService.addUser(newUser);
+      await _databaseService.addUser(adminUser);
 
-      // Delete temporary Firebase app
       await tempApp.delete();
 
-      return newUser;
+      return adminUser;
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
-      throw 'Failed to create restaurant admin account: ${e.toString()}';
+      throw 'Failed to create restaurant admin: $e';
     }
   }
 
-  // ✅ Change Password
+  // =====================================
+  // PASSWORD CHANGE (OPTIONAL FEATURE)
+  // =====================================
   Future<void> changePassword(String newPassword) async {
+    final user = currentUser;
+    if (user == null) return;
+
     try {
-      User? user = currentUser;
-      if (user != null) {
-        await user.updatePassword(newPassword);
-        await _databaseService
-            .getUserData(user.uid)
-            .then((u) => _databaseService.addUser(u!.copyWith(firstLogin: false)));
-      }
+      await user.updatePassword(newPassword);
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
         throw 'Please sign in again to change your password.';
       }
       throw _handleAuthException(e);
-    } catch (e) {
-      throw 'Failed to change password. Please try again.';
     }
   }
 
-  // ✅ Firebase Auth Exception handler
+  // =====================================
+  // ERROR HANDLING
+  // =====================================
   String _handleAuthException(FirebaseAuthException e) {
     switch (e.code) {
       case 'user-not-found':
@@ -155,13 +146,13 @@ class AuthService {
       case 'invalid-email':
         return 'Invalid email address.';
       case 'weak-password':
-        return 'Password is too weak. Use at least 6 characters.';
+        return 'Password is too weak (min 6 characters).';
       case 'user-disabled':
         return 'This account has been disabled.';
       case 'too-many-requests':
-        return 'Too many attempts. Please try again later.';
+        return 'Too many attempts. Try again later.';
       default:
-        return 'Authentication failed. Please try again.';
+        return 'Authentication failed.';
     }
   }
 }

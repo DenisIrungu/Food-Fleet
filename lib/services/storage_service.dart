@@ -31,7 +31,8 @@ class StorageService {
   }) async {
     try {
       final fileExtension = imageFile.path.split('.').last;
-      final fileName = '${fileId}_${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
+      final fileName =
+          '${fileId}_${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
       final Reference ref = _storage.ref().child('$folderName/$fileName');
 
       UploadTask uploadTask;
@@ -55,7 +56,8 @@ class StorageService {
   }
 
   // Specific helper for restaurant logos
-  Future<String?> uploadRestaurantLogo(XFile imageFile, String restaurantId) async {
+  Future<String?> uploadRestaurantLogo(
+      XFile imageFile, String restaurantId) async {
     return await uploadImage(
       imageFile,
       folderName: 'restaurant_logos',

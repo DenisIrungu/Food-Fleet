@@ -7,14 +7,25 @@ class DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // ============================================
-  // USER MANAGEMENT (Single Storage)
+  // USER MANAGEMENT
   // ============================================
 
-  // ✅ Save user data to Firestore (only in main 'users' collection)
+  // ✅ Save user data (Global + Restaurant-linked riders)
   Future<void> addUser(UserModel user) async {
     try {
       await _firestore.collection(COLLECTION_USERS).doc(user.uid).set(user.toMap());
-      print("✅ User saved successfully in 'users' collection.");
+      print("✅ User saved in 'users' collection.");
+
+      // If user is a rider, also store under their restaurant
+      if (user.role == ROLE_RIDER && user.restaurantId != null) {
+        await _firestore
+            .collection(COLLECTION_RESTAURANTS)
+            .doc(user.restaurantId)
+            .collection('riders')
+            .doc(user.uid)
+            .set(user.toMap());
+        print("✅ Rider also saved under restaurant '${user.restaurantName}'.");
+      }
     } catch (e) {
       print("❌ Error saving user data: $e");
       rethrow;
@@ -32,18 +43,28 @@ class DatabaseService {
     }
   }
 
-  // ✅ Delete user
-  Future<void> deleteUser(String uid) async {
+  // ✅ Delete user (also from restaurant if rider)
+  Future<void> deleteUser(String uid, {String? restaurantId}) async {
     try {
       await _firestore.collection(COLLECTION_USERS).doc(uid).delete();
-      print("✅ User deleted successfully.");
+      print("✅ User deleted from main collection.");
+
+      if (restaurantId != null) {
+        await _firestore
+            .collection(COLLECTION_RESTAURANTS)
+            .doc(restaurantId)
+            .collection('riders')
+            .doc(uid)
+            .delete();
+        print("✅ Rider deleted from restaurant subcollection.");
+      }
     } catch (e) {
       print("❌ Error deleting user: $e");
       rethrow;
     }
   }
 
-  // ✅ Get user data by UID
+  // ✅ Get user by UID
   Future<UserModel?> getUserData(String uid) async {
     try {
       final doc = await _firestore.collection(COLLECTION_USERS).doc(uid).get();
@@ -63,7 +84,7 @@ class DatabaseService {
         .map((doc) => doc.exists ? UserModel.fromFirestore(doc) : null);
   }
 
-  // ✅ Get all users by role
+  // ✅ Get users by role
   Stream<List<UserModel>> getUsersByRole(String role) {
     return _firestore
         .collection(COLLECTION_USERS)
@@ -79,7 +100,7 @@ class DatabaseService {
   Stream<List<UserModel>> getAllRiders() => getUsersByRole(ROLE_RIDER);
   Stream<List<UserModel>> getAllCustomers() => getUsersByRole(ROLE_CUSTOMER);
 
-  // ✅ Check if super admin exists
+  // ✅ Check if Super Admin exists
   Future<bool> superAdminExists() async {
     try {
       QuerySnapshot query = await _firestore
@@ -93,22 +114,22 @@ class DatabaseService {
     }
   }
 
-  // ✅ Create Super Admin (once)
+  // ✅ Create Super Admin
   Future<void> createSuperAdmin(String uid, String email, String username) async {
     try {
       UserModel superAdmin = UserModel(
         uid: uid,
         email: email,
         role: ROLE_SUPER_ADMIN,
-        customerName: username,
+        fullName: username,
         firstLogin: false,
         createdAt: DateTime.now(),
       );
 
       await addUser(superAdmin);
-      print("✅ Super admin created successfully with UID: $uid");
+      print("✅ Super Admin created with UID: $uid");
     } catch (e) {
-      print("❌ Error creating super admin: $e");
+      print("❌ Error creating Super Admin: $e");
       rethrow;
     }
   }
@@ -131,33 +152,123 @@ class DatabaseService {
   }
 
   // ============================================
-  // RESTAURANT MANAGEMENT
+  // RIDER MANAGEMENT (Under Restaurants)
   // ============================================
 
-  Future<String> createRestaurant(RestaurantModel restaurant) async {
+  Stream<List<UserModel>> getRidersByRestaurant(String restaurantId) {
+    return _firestore
+        .collection(COLLECTION_RESTAURANTS)
+        .doc(restaurantId)
+        .collection('riders')
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList());
+  }
+
+  Future<void> deleteRider(String restaurantId, String riderUid) async {
     try {
-      print('📝 Attempting to create restaurant: ${restaurant.name}');
-      print('📋 Data: ${restaurant.toMap()}');
-
-      // ✅ Use doc() instead of add() for controlled ID
-      final docRef = _firestore.collection(COLLECTION_RESTAURANTS).doc();
-      await docRef.set({
-        ...restaurant.toMap(),
-        'id': docRef.id,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      print('✅ Restaurant created with ID: ${docRef.id}');
-      return docRef.id;
-    } catch (e, stack) {
-      print('❌ Firestore write failed: $e');
-      print(stack);
+      await _firestore.collection(COLLECTION_USERS).doc(riderUid).delete();
+      await _firestore
+          .collection(COLLECTION_RESTAURANTS)
+          .doc(restaurantId)
+          .collection('riders')
+          .doc(riderUid)
+          .delete();
+      print("✅ Rider deleted from both collections.");
+    } catch (e) {
+      print("❌ Error deleting rider: $e");
       rethrow;
     }
   }
 
-  // ✅ Get all restaurants
+  // ============================================
+  // RESTAURANT MANAGEMENT
+  // ============================================
+
+  Future<String> createRestaurant(RestaurantModel restaurant) async {
+  try {
+    print('📝 Creating restaurant: ${restaurant.name}');
+
+    // 🚫 PREVENT DUPLICATION (same email)
+    final existing = await _firestore
+        .collection(COLLECTION_RESTAURANTS)
+        .where('email', isEqualTo: restaurant.email)
+        .limit(1)
+        .get();
+
+    if (existing.docs.isNotEmpty) {
+      throw Exception(
+        'Restaurant with email ${restaurant.email} already exists',
+      );
+    }
+
+    // ✅ Safe to create
+    final docRef = _firestore.collection(COLLECTION_RESTAURANTS).doc();
+
+    await docRef.set({
+      ...restaurant.toMap(),
+      'id': docRef.id,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    print('✅ Restaurant created with ID: ${docRef.id}');
+    return docRef.id;
+  } catch (e, stack) {
+    print('❌ Firestore write failed: $e');
+    print(stack);
+    rethrow;
+  }
+}
+
+// ✅ Super Admin creates restaurant & admin user
+  Future<void> createRestaurantWithAdmin({
+  required RestaurantModel restaurant,
+  required UserModel adminUser,
+}) async {
+  try {
+    print("📝 Creating restaurant and admin...");
+
+    // 🚫 Prevent duplicate restaurant by email
+    final exists = await restaurantExistsByEmail(restaurant.email);
+    if (exists) {
+      throw Exception('Restaurant with this email already exists');
+    }
+
+    final restaurantId = await createRestaurant(restaurant);
+
+    final updatedAdmin = adminUser.copyWith(
+      restaurantId: restaurantId,
+      role: ROLE_RESTAURANT_ADMIN,
+    );
+
+    await addUser(updatedAdmin);
+    await updateRestaurantData(restaurantId, {'adminUid': adminUser.uid});
+
+    print("✅ Restaurant & admin successfully created and linked.");
+  } catch (e) {
+    print("❌ Error creating restaurant with admin: $e");
+    rethrow;
+  }
+}
+
+  // ✅ Check if restaurant already exists by email
+Future<bool> restaurantExistsByEmail(String email) async {
+  try {
+    final query = await _firestore
+        .collection(COLLECTION_RESTAURANTS)
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+
+    return query.docs.isNotEmpty;
+  } catch (e) {
+    print("❌ Error checking restaurant email: $e");
+    rethrow;
+  }
+}
+
+
   Stream<List<RestaurantModel>> getAllRestaurants() {
     return _firestore
         .collection(COLLECTION_RESTAURANTS)
@@ -167,7 +278,6 @@ class DatabaseService {
             snapshot.docs.map((doc) => RestaurantModel.fromFirestore(doc)).toList());
   }
 
-  // ✅ Get restaurant by ID
   Future<RestaurantModel?> getRestaurantById(String restaurantId) async {
     try {
       DocumentSnapshot doc =
@@ -179,7 +289,6 @@ class DatabaseService {
     }
   }
 
-  // ✅ Get restaurant by admin UID
   Future<RestaurantModel?> getRestaurantByAdminUid(String adminUid) async {
     try {
       QuerySnapshot query = await _firestore
@@ -194,19 +303,17 @@ class DatabaseService {
     }
   }
 
-  // ✅ Update restaurant data with timestamp
   Future<void> updateRestaurantData(
       String restaurantId, Map<String, dynamic> updates) async {
     try {
       updates['updatedAt'] = FieldValue.serverTimestamp();
       await _firestore.collection(COLLECTION_RESTAURANTS).doc(restaurantId).update(updates);
-      print("✅ Restaurant data updated successfully.");
+      print("✅ Restaurant updated successfully.");
     } catch (e) {
       throw 'Failed to update restaurant: ${e.toString()}';
     }
   }
 
-  // ✅ Delete restaurant
   Future<void> deleteRestaurant(String restaurantId) async {
     try {
       await _firestore.collection(COLLECTION_RESTAURANTS).doc(restaurantId).delete();
@@ -216,7 +323,6 @@ class DatabaseService {
     }
   }
 
-  // ✅ Get restaurant count
   Future<int> getRestaurantCount() async {
     try {
       AggregateQuerySnapshot snapshot =

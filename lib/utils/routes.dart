@@ -3,6 +3,7 @@ const String SPLASH_ROUTE = '/';
 const String LOGIN_ROUTE = '/login';
 const String REGISTER_ROUTE = '/register';
 const String CHANGE_PASSWORD_ROUTE = '/change-password';
+const String CREATE_ADMIN= '/create-admin';
 
 // Dashboard Routes
 const String SUPER_ADMIN_DASHBOARD_ROUTE = '/super-admin-dashboard';

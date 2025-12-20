@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import '../models/restaurant_model.dart';
+import '../models/user_model.dart';
 import '../services/database_service.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
@@ -20,101 +21,87 @@ class RestaurantController extends ChangeNotifier {
 
   RestaurantController();
 
-  // Stream restaurants
+  // ✅ Stream all restaurants
   Stream<List<RestaurantModel>> getRestaurantsStream() =>
       _databaseService.getAllRestaurants();
 
-  // Pick image (optional)
+  // ✅ Pick image (optional)
   Future<XFile?> pickImage() async {
     try {
-      return await _storage_service_pick();
+      return await _storageService.pickImageFromGallery();
     } catch (e) {
       print('❌ pickImage error: $e');
       return null;
     }
   }
 
-  Future<XFile?> _storage_service_pick() async {
-    return await _storageService.pickImageFromGallery();
-  }
-
-  /// -------------------------
-  /// Simplified Create Restaurant
-  /// - Only writes restaurant doc to Firestore (super admin must be signed in)
-  /// - No Auth user creation, no image upload (we'll add those later after this works)
-  /// - Robust logging and timeout to avoid silent freezes
+    /// ✅ Create Restaurant + Admin
   Future<bool> createRestaurant({
     required String name,
     required String email,
-    required String password, // kept for future use, currently ignored
+    required String password,
     required String phone,
     required String address,
     required List<String> cuisines,
     String? description,
-    XFile? image, // kept for future integration, currently ignored
+    XFile? image,
   }) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      print('🚀 [CreateRestaurant] Entered simplified flow');
-      print('📧 email: $email | name: $name | phone: $phone');
+      print('🚀 [CreateRestaurant] Start creating restaurant + admin');
 
-      // Build data map (defensive: ensure types are what Firestore expects)
-      final Map<String, dynamic> data = {
-        'name': name,
-        'adminUid': null, // no admin user yet; can be updated later
-        'email': email,
-        'phone': phone,
-        'address': address,
-        'cuisineTypes': cuisines,
-        'description': description ?? '',
-        'imageUrl': null,
-        'status': 'active',
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-
-      print('📝 [CreateRestaurant] Writing document to collection: $COLLECTION_RESTAURANTS');
-      print('📦 Data preview (no timestamps): ${{
-        'name': data['name'],
-        'email': data['email'],
-        'phone': data['phone'],
-        'address': data['address'],
-        'cuisineTypes': data['cuisineTypes'],
-        'description': data['description'],
-        'status': data['status'],
-      }}');
-
-      // Use a timeout to surface network/rules problems quickly
-      final docRef = await _firestore
-          .collection(COLLECTION_RESTAURANTS)
-          .add(data)
-          .timeout(const Duration(seconds: 15), onTimeout: () {
-        throw Exception('⏱️ Firestore add() timed out — check network or rules.');
-      });
-
-      print('✅ [CreateRestaurant] Firestore doc created with ID: ${docRef.id}');
-
-      // Optional: if you want to keep DatabaseService in sync, you can return that id
-      // or call any further DB helpers here. For now we show success and return true.
-      Fluttertoast.showToast(
-        msg: '✅ Restaurant created successfully!',
-        backgroundColor: Colors.green,
+      // Step 1️⃣: Create restaurant object (adminUid temporarily empty)
+      final restaurant = RestaurantModel(
+        id: '',
+        name: name,
+        adminUid: '', // initially empty, will update after admin creation
+        email: email,
+        phone: phone,
+        address: address,
+        cuisineTypes: cuisines,
+        description: description ?? '',
+        imageUrl: null,
+        status: 'active',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
 
-      return true;
-    } on FirebaseException catch (e, s) {
-      // Firestore-specific errors (permissions, etc.)
-      print('❌ [CreateRestaurant] FirebaseException: ${e.code} - ${e.message}');
-      print(s);
-      Fluttertoast.showToast(
-        msg: '❌ Firestore error: ${e.message}',
-        backgroundColor: Colors.red,
+      // Step 2️⃣: Save restaurant to Firestore → get ID
+      final restaurantId = await _databaseService.createRestaurant(restaurant);
+      print('✅ Restaurant created with ID: $restaurantId');
+
+      // Step 3️⃣: Create Restaurant Admin user
+      final newAdmin = await _authService.createRestaurantAdmin(
+        email: email,
+        password: password,
+        restaurantId: restaurantId,
+        restaurantName: name,
       );
-      return false;
+
+      if (newAdmin != null) {
+        // Step 4️⃣: Update restaurant with admin UID
+        await _databaseService.updateRestaurantData(restaurantId, {
+          'adminUid': newAdmin.uid,
+        });
+        print('✅ Linked admin ${newAdmin.uid} to restaurant $restaurantId');
+
+        Fluttertoast.showToast(
+          msg: '✅ Restaurant & Admin created successfully!',
+          backgroundColor: Colors.green,
+        );
+        return true;
+      } else {
+        print('❌ Failed to create admin user.');
+        Fluttertoast.showToast(
+          msg: '❌ Failed to create restaurant admin.',
+          backgroundColor: Colors.red,
+        );
+        return false;
+      }
     } catch (e, s) {
-      print('❌ [CreateRestaurant] Unexpected error: $e');
+      print('❌ [CreateRestaurant] Error: $e');
       print(s);
       Fluttertoast.showToast(
         msg: '❌ Error: ${e.toString()}',
@@ -127,19 +114,22 @@ class RestaurantController extends ChangeNotifier {
     }
   }
 
-  // -------------------------
-  // Delete Restaurant
-  // -------------------------
+
+  /// ✅ Delete restaurant + admin user
   Future<bool> deleteRestaurant(RestaurantModel restaurant) async {
     _isLoading = true;
     notifyListeners();
 
     try {
       print('🗑️ Deleting restaurant ${restaurant.id}...');
-      await _database_service_delete(restaurant.id);
-await _databaseService.deleteUser(restaurant.adminUid);
 
+      // Step 1️⃣: Delete restaurant doc
+      await _databaseService.deleteRestaurant(restaurant.id);
 
+      // Step 2️⃣: Delete admin user (if exists)
+      await _databaseService.deleteUser(restaurant.adminUid!);
+      print('✅ Deleted linked admin user');
+    
       Fluttertoast.showToast(
         msg: '✅ Restaurant deleted successfully!',
         backgroundColor: Colors.green,
@@ -156,23 +146,6 @@ await _databaseService.deleteUser(restaurant.adminUid);
     } finally {
       _isLoading = false;
       notifyListeners();
-    }
-  }
-
-  // internal wrapper to call the existing database service delete with logs
-  Future<void> _database_service_delete(String restaurantId) async {
-    try {
-      print('🔁 Calling DatabaseService.deleteRestaurant($restaurantId)');
-      await _databaseService.deleteRestaurant(restaurantId).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw Exception('⏱️ deleteRestaurant() timed out');
-        },
-      );
-      print('✅ DatabaseService.deleteRestaurant done');
-    } catch (e) {
-      print('❌ _database_service_delete error: $e');
-      rethrow;
     }
   }
 }

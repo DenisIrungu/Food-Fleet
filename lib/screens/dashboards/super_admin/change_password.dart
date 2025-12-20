@@ -1,5 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:foodfleet/utils/routes.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -10,11 +12,9 @@ class ChangePasswordScreen extends StatefulWidget {
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
 
   bool _loading = false;
-  bool _obscureCurrent = true;
   bool _obscureNew = true;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -28,50 +28,65 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     try {
       final user = _auth.currentUser;
       if (user == null) {
+        throw FirebaseAuthException(code: 'no-user');
+      }
+
+      // 1️⃣ Update password
+      await user.updatePassword(_newPasswordController.text);
+
+      // 2️⃣ Mark first login complete
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({'firstLogin': false});
+
+      if (!mounted) return;
+
+      // 3️⃣ Notify success
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Password changed successfully'),
+          backgroundColor: colorScheme.primaryContainer,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      // 4️⃣ Restart routing logic
+      await Future.delayed(const Duration(seconds: 2));
+
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        SPLASH_ROUTE,
+        (route) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      String error = 'Something went wrong';
+
+      if (e.code == 'weak-password') {
+        error = 'Password must be at least 6 characters';
+      } else if (e.code == 'requires-recent-login') {
+        error = 'Please sign in again to change your password';
+      }
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('No user logged in'),
+            content: Text(error),
             backgroundColor: colorScheme.errorContainer,
             behavior: SnackBarBehavior.floating,
           ),
         );
-        return;
       }
-
-      final credential = EmailAuthProvider.credential(
-        email: user.email!,
-        password: _currentPasswordController.text,
-      );
-
-      await user.reauthenticateWithCredential(credential);
-      await user.updatePassword(_newPasswordController.text);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Password updated successfully!'),
-          backgroundColor: colorScheme.primaryContainer,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
-      Navigator.pop(context);
-    } on FirebaseAuthException catch (e) {
-      String error = 'Something went wrong';
-      if (e.code == 'wrong-password') {
-        error = 'Incorrect current password';
-      } else if (e.code == 'weak-password') {
-        error = 'New password is too weak';
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          backgroundColor: colorScheme.errorContainer,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _newPasswordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -95,30 +110,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  TextFormField(
-                    controller: _currentPasswordController,
-                    obscureText: _obscureCurrent,
-                    decoration: InputDecoration(
-                      labelText: 'Current Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureCurrent
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
-                        onPressed: () {
-                          setState(() => _obscureCurrent = !_obscureCurrent);
-                        },
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    validator: (val) =>
-                        val!.isEmpty ? 'Enter your current password' : null,
+                  Text(
+                    'You must change your password before continuing',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyLarge,
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
                   TextFormField(
                     controller: _newPasswordController,
                     obscureText: _obscureNew,
@@ -127,9 +124,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       prefixIcon: const Icon(Icons.lock_reset),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscureNew
-                              ? Icons.visibility_off
-                              : Icons.visibility,
+                          _obscureNew ? Icons.visibility_off : Icons.visibility,
                         ),
                         onPressed: () {
                           setState(() => _obscureNew = !_obscureNew);
@@ -140,8 +135,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       ),
                     ),
                     validator: (val) {
-                      if (val!.isEmpty) return 'Enter a new password';
-                      if (val.length < 6) return 'Password must be at least 6 characters';
+                      if (val == null || val.isEmpty) {
+                        return 'Enter a new password';
+                      }
+                      if (val.length < 6) {
+                        return 'Password must be at least 6 characters';
+                      }
                       return null;
                     },
                   ),
