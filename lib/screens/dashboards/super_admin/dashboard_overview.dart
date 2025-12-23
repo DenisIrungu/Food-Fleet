@@ -75,10 +75,10 @@ class DashboardOverview extends StatelessWidget {
                 _SummaryItem(
                     'Total Restaurants', totalRestaurants, Icons.restaurant),
                 _SummaryItem('Total Customers', '1,420', Icons.people),
-                _SummaryItem('Active Restaurants', activeRestaurants,
-                    Icons.delivery_dining),
+                _SummaryItem(
+                    'Active Restaurants', activeRestaurants, Icons.storefront),
                 _SummaryItem('Inactive Restaurants', inactiveRestaurants,
-                    Icons.check_circle_outline),
+                    Icons.store_mall_directory_outlined),
               ];
 
               return LayoutBuilder(builder: (context, constraints) {

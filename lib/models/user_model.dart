@@ -10,6 +10,7 @@ class UserModel {
   final String? phone; // New field for phone number
   final bool firstLogin; // For password reset requirement
   final DateTime createdAt;
+  final String? profilePictureUrl;
 
   UserModel({
     required this.uid,
@@ -21,6 +22,7 @@ class UserModel {
     this.phone,
     required this.firstLogin,
     required this.createdAt,
+    this.profilePictureUrl,
   });
 
   // Create UserModel from Firestore document
@@ -36,6 +38,7 @@ class UserModel {
       phone: data['phone'],
       firstLogin: data['firstLogin'] ?? false,
       createdAt: (data['createdAt'] as Timestamp).toDate(),
+      profilePictureUrl: data['profilePictureUrl'],
     );
   }
 
@@ -50,6 +53,7 @@ class UserModel {
       'phone': phone,
       'firstLogin': firstLogin,
       'createdAt': Timestamp.fromDate(createdAt),
+      'profilePictureUrl': profilePictureUrl,
     };
   }
 
@@ -80,6 +84,7 @@ class UserModel {
     String? phone,
     bool? firstLogin,
     DateTime? createdAt,
+    String? profilePictureUrl,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -91,6 +96,7 @@ class UserModel {
       phone: phone ?? this.phone,
       firstLogin: firstLogin ?? this.firstLogin,
       createdAt: createdAt ?? this.createdAt,
+      profilePictureUrl: profilePictureUrl ?? this.profilePictureUrl, // Added
     );
   }
 }

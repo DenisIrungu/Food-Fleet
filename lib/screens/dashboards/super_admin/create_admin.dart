@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:foodfleet/models/restaurant_model.dart';
 import 'package:foodfleet/services/auth_service.dart';
 import 'package:foodfleet/utils/validators.dart';
@@ -14,6 +16,7 @@ class CreateAdmin extends StatefulWidget {
 
 class _CreateAdminPageState extends State<CreateAdmin> {
   final _formKey = GlobalKey<FormState>();
+
   final _restaurantNameController = TextEditingController();
   final _addressController = TextEditingController();
   final _cuisineTypeController = TextEditingController();
@@ -22,13 +25,34 @@ class _CreateAdminPageState extends State<CreateAdmin> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  bool _isLoading = false;
   final _databaseService = DatabaseService();
-  final AuthService _authService = AuthService();
+  final _authService = AuthService();
+  final _picker = ImagePicker();
 
+  bool _isLoading = false;
   String? _emailError;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  File? _selectedImage;
+
+  RestaurantModel? _editingRestaurant;
+  bool get isEditMode => _editingRestaurant != null;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is RestaurantModel && _editingRestaurant == null) {
+      _editingRestaurant = args;
+
+      _restaurantNameController.text = args.name;
+      _addressController.text = args.address;
+      _cuisineTypeController.text = args.cuisineTypes.join(', ');
+      _emailController.text = args.email;
+      _phoneController.text = args.phone;
+    }
+  }
 
   void _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
@@ -39,7 +63,38 @@ class _CreateAdminPageState extends State<CreateAdmin> {
     });
 
     try {
-      // 1️⃣ Create restaurant FIRST (without adminUid)
+      /// ✏️ EDIT MODE
+      if (isEditMode) {
+        await _databaseService.updateRestaurantData(
+          _editingRestaurant!.id,
+          {
+            'name': _restaurantNameController.text.trim(),
+            'address': _addressController.text.trim(),
+            'phone': _phoneController.text.trim(),
+            'email': _emailController.text.trim(),
+            'cuisineTypes': _cuisineTypeController.text
+                .split(',')
+                .map((e) => e.trim())
+                .where((e) => e.isNotEmpty)
+                .toList(),
+            'updatedAt': DateTime.now(),
+          },
+        );
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Restaurant updated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        Navigator.pop(context);
+        return;
+      }
+
+      /// ➕ CREATE MODE (UNCHANGED)
       final restaurant = RestaurantModel(
         id: '',
         name: _restaurantNameController.text.trim(),
@@ -57,10 +112,8 @@ class _CreateAdminPageState extends State<CreateAdmin> {
         updatedAt: DateTime.now(),
       );
 
-      // Save restaurant and get its ID
       final restaurantId = await _databaseService.createRestaurant(restaurant);
 
-      // 2️⃣ Create restaurant admin (Auth + Firestore)
       final adminUser = await _authService.createRestaurantAdmin(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
@@ -68,12 +121,20 @@ class _CreateAdminPageState extends State<CreateAdmin> {
         restaurantName: restaurant.name,
       );
 
-      // 3️⃣ Update restaurant with admin UID
+      if (_selectedImage != null && adminUser != null) {
+        final profileUrl = await _databaseService.updateProfilePicture(
+          adminUser.uid,
+          _selectedImage!,
+        );
+        await _databaseService.updateUser(
+          adminUser.uid,
+          {'profilePictureUrl': profileUrl},
+        );
+      }
+
       await _databaseService.updateRestaurantData(
         restaurantId,
-        {
-          'adminUid': adminUser!.uid,
-        },
+        {'adminUid': adminUser!.uid},
       );
 
       if (!mounted) return;
@@ -86,21 +147,27 @@ class _CreateAdminPageState extends State<CreateAdmin> {
       );
 
       _formKey.currentState!.reset();
+      setState(() => _selectedImage = null);
     } catch (e) {
       if (e.toString().toLowerCase().contains('email')) {
-        setState(() {
-          _emailError = 'This email is already registered';
-        });
+        _emailError = 'This email is already registered';
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_emailError ?? '❌ Failed to create restaurant'),
+          content: Text(_emailError ?? '❌ Operation failed'),
           backgroundColor: Colors.redAccent,
         ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() => _selectedImage = File(pickedFile.path));
     }
   }
 
@@ -122,98 +189,39 @@ class _CreateAdminPageState extends State<CreateAdmin> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Register Restaurant Admin'),
+        title:
+            Text(isEditMode ? 'Edit Restaurant' : 'Register Restaurant Admin'),
         centerTitle: true,
       ),
       body: LayoutBuilder(builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final isWide = width >= 800;
-        final horizontalPadding = width >= 1200 ? 64.0 : (isWide ? 40.0 : 16.0);
-        final contentMaxWidth = min(width, 1000.0);
+        final isWide = constraints.maxWidth >= 800;
 
-        return Align(
-          alignment: Alignment.topCenter,
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding, vertical: 24),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: contentMaxWidth),
-              child: Card(
-                elevation: 6,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Create Restaurant & Admin',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                            ),
-                            if (isWide)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 12.0),
-                                child: Text(
-                                  'Step 1 of 1',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        isWide
-                            ? _buildTwoColumnFields()
-                            : _buildSingleColumnFields(),
-                        const SizedBox(height: 20),
-                        _isLoading
-                            ? const Center(child: CircularProgressIndicator())
-                            : Row(
-                                children: [
-                                  Expanded(
-                                    child: TextButton.icon(
-                                      onPressed:
-                                          _isLoading ? null : _submitForm,
-                                      icon: const Icon(Icons.add,
-                                          color: Colors.white),
-                                      label: const Text(
-                                        'Add Restaurant Admin',
-                                        style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold),
-                                      ),
-                                      style: TextButton.styleFrom(
-                                        backgroundColor: _isLoading
-                                            ? Colors.grey
-                                            : colorScheme.secondary,
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 14),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ],
-                    ),
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                isWide ? _buildTwoColumnFields() : _buildSingleColumnFields(),
+                const SizedBox(height: 20),
+                if (!isEditMode)
+                  ElevatedButton.icon(
+                    onPressed: _pickImage,
+                    icon: const Icon(Icons.image),
+                    label: const Text('Select Image'),
                   ),
-                ),
-              ),
+                const SizedBox(height: 20),
+                _isLoading
+                    ? const CircularProgressIndicator()
+                    : ElevatedButton(
+                        onPressed: _submitForm,
+                        child: Text(
+                          isEditMode
+                              ? 'Update Restaurant'
+                              : 'Add Restaurant Admin',
+                        ),
+                      ),
+              ],
             ),
           ),
         );
@@ -227,227 +235,65 @@ class _CreateAdminPageState extends State<CreateAdmin> {
         _buildTextField(
           controller: _restaurantNameController,
           label: 'Restaurant Name',
-          hint: 'e.g. The Tasty Spoon',
           validator: (v) => Validators.validateRequired(v, 'Restaurant Name'),
-          prefix: const Icon(Icons.restaurant),
         ),
-        const SizedBox(height: 12),
         _buildTextField(
           controller: _addressController,
           label: 'Restaurant Address',
-          hint: 'Street, City, Country',
           validator: (v) => Validators.validateRequired(v, 'Address'),
-          prefix: const Icon(Icons.location_on),
         ),
-        const SizedBox(height: 12),
         _buildTextField(
           controller: _cuisineTypeController,
           label: 'Cuisine Type',
-          hint: 'e.g. Italian, African, Chinese',
           validator: (v) => Validators.validateRequired(v, 'Cuisine Type'),
-          prefix: const Icon(Icons.fastfood),
         ),
-        const SizedBox(height: 12),
         _buildTextField(
           controller: _emailController,
           label: 'Admin Email',
-          validator: (v) => _emailError ?? Validators.validateEmail(v),
-          keyboardType: TextInputType.emailAddress,
-          prefix: const Icon(Icons.email),
+          validator: Validators.validateEmail,
         ),
-        const SizedBox(height: 12),
-        _buildTextField(
-          controller: _passwordController,
-          label: 'Admin Password',
-          hint: 'Minimum 6 characters',
-          validator: Validators.validatePassword,
-          keyboardType: TextInputType.visiblePassword,
-          prefix: const Icon(Icons.lock),
-          obscureText: _obscurePassword,
-          suffix: IconButton(
-            icon: Icon(
-              _obscurePassword ? Icons.visibility : Icons.visibility_off,
-            ),
-            onPressed: () {
-              setState(() {
-                _obscurePassword = !_obscurePassword;
-              });
-            },
-          ),
-        ),
-        const SizedBox(height: 12),
-        _buildTextField(
-          controller: _confirmPasswordController,
-          label: 'Confirm Password',
-          validator: (v) {
-            if (v != _passwordController.text) {
-              return 'Passwords do not match';
-            }
-            return null;
-          },
-          keyboardType: TextInputType.visiblePassword,
-          prefix: const Icon(Icons.lock_outline),
-          obscureText: _obscureConfirmPassword,
-          suffix: IconButton(
-            icon: Icon(
-              _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
-            ),
-            onPressed: () {
-              setState(() {
-                _obscureConfirmPassword = !_obscureConfirmPassword;
-              });
-            },
-          ),
-        ),
-        const SizedBox(height: 12),
         _buildTextField(
           controller: _phoneController,
           label: 'Phone Number',
           validator: Validators.validatePhone,
-          keyboardType: TextInputType.phone,
-          prefix: const Icon(Icons.phone),
         ),
+        if (!isEditMode) ...[
+          _buildTextField(
+            controller: _passwordController,
+            label: 'Admin Password',
+            validator: Validators.validatePassword,
+            obscureText: _obscurePassword,
+          ),
+          _buildTextField(
+            controller: _confirmPasswordController,
+            label: 'Confirm Password',
+            validator: (v) =>
+                v != _passwordController.text ? 'Passwords do not match' : null,
+            obscureText: _obscureConfirmPassword,
+          ),
+        ],
       ],
     );
   }
 
-  Widget _buildTwoColumnFields() {
-    return LayoutBuilder(builder: (context, constraints) {
-      final gap = 16.0;
-      final columnWidth = (constraints.maxWidth - gap) / 2;
-
-      Widget leftColumn = SizedBox(
-        width: columnWidth,
-        child: Column(
-          children: [
-            _buildTextField(
-              controller: _restaurantNameController,
-              label: 'Restaurant Name',
-              validator: (v) =>
-                  Validators.validateRequired(v, 'Restaurant Name'),
-              prefix: const Icon(Icons.restaurant),
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _cuisineTypeController,
-              label: 'Cuisine Type',
-              validator: (v) => Validators.validateRequired(v, 'Cuisine Type'),
-              prefix: const Icon(Icons.fastfood),
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _phoneController,
-              label: 'Phone Number',
-              validator: Validators.validatePhone,
-              keyboardType: TextInputType.phone,
-              prefix: const Icon(Icons.phone),
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _passwordController,
-              label: 'Admin Password',
-              validator: Validators.validatePassword,
-              keyboardType: TextInputType.visiblePassword,
-              prefix: const Icon(Icons.lock),
-              obscureText: _obscurePassword,
-              suffix: IconButton(
-                icon: Icon(
-                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _obscurePassword = !_obscurePassword;
-                  });
-                },
-              ),
-            ),
-          ],
-        ),
-      );
-
-      Widget rightColumn = SizedBox(
-        width: columnWidth,
-        child: Column(
-          children: [
-            _buildTextField(
-              controller: _addressController,
-              label: 'Restaurant Address',
-              validator: (v) => Validators.validateRequired(v, 'Address'),
-              prefix: const Icon(Icons.location_on),
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _emailController,
-              label: 'Admin Email',
-              validator: Validators.validateEmail,
-              keyboardType: TextInputType.emailAddress,
-              prefix: const Icon(Icons.email),
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _confirmPasswordController,
-              label: 'Confirm Password',
-              validator: (v) {
-                if (v != _passwordController.text) {
-                  return 'Passwords do not match';
-                }
-                return null;
-              },
-              keyboardType: TextInputType.visiblePassword,
-              prefix: const Icon(Icons.lock_outline),
-              obscureText: _obscureConfirmPassword,
-              suffix: IconButton(
-                icon: Icon(
-                  _obscureConfirmPassword
-                      ? Icons.visibility
-                      : Icons.visibility_off,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _obscureConfirmPassword = !_obscureConfirmPassword;
-                  });
-                },
-              ),
-            ),
-          ],
-        ),
-      );
-
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          leftColumn,
-          SizedBox(width: gap),
-          rightColumn,
-        ],
-      );
-    });
-  }
+  Widget _buildTwoColumnFields() => _buildSingleColumnFields();
 
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
-    String? hint,
     String? Function(String?)? validator,
-    TextInputType keyboardType = TextInputType.text,
-    Widget? prefix,
-    Widget? suffix,
     bool obscureText = false,
   }) {
-    return TextFormField(
-      controller: controller,
-      validator: validator,
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: prefix,
-        suffixIcon: suffix,
-        filled: true,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextFormField(
+        controller: controller,
+        validator: validator,
+        obscureText: obscureText,
+        decoration: InputDecoration(
+          labelText: label,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        ),
       ),
     );
   }

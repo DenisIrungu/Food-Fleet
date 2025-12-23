@@ -1,10 +1,14 @@
+// Updated database_service.dart
+import 'dart:io'; // For File
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart'; // New import for Storage
 import '/models/user_model.dart';
 import '/models/restaurant_model.dart';
 import '/utils/constants.dart';
 
 class DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance; // New for Storage
 
   // ============================================
   // USER MANAGEMENT
@@ -13,7 +17,10 @@ class DatabaseService {
   // ✅ Save user data (Global + Restaurant-linked riders)
   Future<void> addUser(UserModel user) async {
     try {
-      await _firestore.collection(COLLECTION_USERS).doc(user.uid).set(user.toMap());
+      await _firestore
+          .collection(COLLECTION_USERS)
+          .doc(user.uid)
+          .set(user.toMap());
       print("✅ User saved in 'users' collection.");
 
       // If user is a rider, also store under their restaurant
@@ -40,6 +47,24 @@ class DatabaseService {
     } catch (e) {
       print("❌ Error updating user: $e");
       rethrow;
+    }
+  }
+
+  // ✅ New: Upload and update profile picture for user (e.g., restaurant admin)
+  Future<String?> updateProfilePicture(String uid, File imageFile) async {
+    try {
+      // Upload to Storage
+      final ref = _storage.ref('profile_pictures/$uid.jpg');
+      await ref.putFile(imageFile);
+      final url = await ref.getDownloadURL();
+
+      // Update Firestore user doc
+      await updateUser(uid, {'profilePictureUrl': url});
+      print("✅ Profile picture uploaded and updated.");
+      return url;
+    } catch (e) {
+      print("❌ Error uploading profile picture: $e");
+      return null;
     }
   }
 
@@ -115,7 +140,8 @@ class DatabaseService {
   }
 
   // ✅ Create Super Admin
-  Future<void> createSuperAdmin(String uid, String email, String username) async {
+  Future<void> createSuperAdmin(
+      String uid, String email, String username) async {
     try {
       UserModel superAdmin = UserModel(
         uid: uid,
@@ -186,102 +212,104 @@ class DatabaseService {
   // ============================================
 
   Future<String> createRestaurant(RestaurantModel restaurant) async {
-  try {
-    print('📝 Creating restaurant: ${restaurant.name}');
+    try {
+      print('📝 Creating restaurant: ${restaurant.name}');
 
-    // 🚫 PREVENT DUPLICATION (same email)
-    final existing = await _firestore
-        .collection(COLLECTION_RESTAURANTS)
-        .where('email', isEqualTo: restaurant.email)
-        .limit(1)
-        .get();
+      // 🚫 PREVENT DUPLICATION (same email)
+      final existing = await _firestore
+          .collection(COLLECTION_RESTAURANTS)
+          .where('email', isEqualTo: restaurant.email)
+          .limit(1)
+          .get();
 
-    if (existing.docs.isNotEmpty) {
-      throw Exception(
-        'Restaurant with email ${restaurant.email} already exists',
-      );
+      if (existing.docs.isNotEmpty) {
+        throw Exception(
+          'Restaurant with email ${restaurant.email} already exists',
+        );
+      }
+
+      // ✅ Safe to create
+      final docRef = _firestore.collection(COLLECTION_RESTAURANTS).doc();
+
+      await docRef.set({
+        ...restaurant.toMap(),
+        'id': docRef.id,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      print('✅ Restaurant created with ID: ${docRef.id}');
+      return docRef.id;
+    } catch (e, stack) {
+      print('❌ Firestore write failed: $e');
+      print(stack);
+      rethrow;
     }
-
-    // ✅ Safe to create
-    final docRef = _firestore.collection(COLLECTION_RESTAURANTS).doc();
-
-    await docRef.set({
-      ...restaurant.toMap(),
-      'id': docRef.id,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-
-    print('✅ Restaurant created with ID: ${docRef.id}');
-    return docRef.id;
-  } catch (e, stack) {
-    print('❌ Firestore write failed: $e');
-    print(stack);
-    rethrow;
   }
-}
 
 // ✅ Super Admin creates restaurant & admin user
   Future<void> createRestaurantWithAdmin({
-  required RestaurantModel restaurant,
-  required UserModel adminUser,
-}) async {
-  try {
-    print("📝 Creating restaurant and admin...");
+    required RestaurantModel restaurant,
+    required UserModel adminUser,
+  }) async {
+    try {
+      print("📝 Creating restaurant and admin...");
 
-    // 🚫 Prevent duplicate restaurant by email
-    final exists = await restaurantExistsByEmail(restaurant.email);
-    if (exists) {
-      throw Exception('Restaurant with this email already exists');
+      // 🚫 Prevent duplicate restaurant by email
+      final exists = await restaurantExistsByEmail(restaurant.email);
+      if (exists) {
+        throw Exception('Restaurant with this email already exists');
+      }
+
+      final restaurantId = await createRestaurant(restaurant);
+
+      final updatedAdmin = adminUser.copyWith(
+        restaurantId: restaurantId,
+        role: ROLE_RESTAURANT_ADMIN,
+      );
+
+      await addUser(updatedAdmin);
+      await updateRestaurantData(restaurantId, {'adminUid': adminUser.uid});
+
+      print("✅ Restaurant & admin successfully created and linked.");
+    } catch (e) {
+      print("❌ Error creating restaurant with admin: $e");
+      rethrow;
     }
-
-    final restaurantId = await createRestaurant(restaurant);
-
-    final updatedAdmin = adminUser.copyWith(
-      restaurantId: restaurantId,
-      role: ROLE_RESTAURANT_ADMIN,
-    );
-
-    await addUser(updatedAdmin);
-    await updateRestaurantData(restaurantId, {'adminUid': adminUser.uid});
-
-    print("✅ Restaurant & admin successfully created and linked.");
-  } catch (e) {
-    print("❌ Error creating restaurant with admin: $e");
-    rethrow;
   }
-}
 
   // ✅ Check if restaurant already exists by email
-Future<bool> restaurantExistsByEmail(String email) async {
-  try {
-    final query = await _firestore
-        .collection(COLLECTION_RESTAURANTS)
-        .where('email', isEqualTo: email)
-        .limit(1)
-        .get();
+  Future<bool> restaurantExistsByEmail(String email) async {
+    try {
+      final query = await _firestore
+          .collection(COLLECTION_RESTAURANTS)
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
 
-    return query.docs.isNotEmpty;
-  } catch (e) {
-    print("❌ Error checking restaurant email: $e");
-    rethrow;
+      return query.docs.isNotEmpty;
+    } catch (e) {
+      print("❌ Error checking restaurant email: $e");
+      rethrow;
+    }
   }
-}
-
 
   Stream<List<RestaurantModel>> getAllRestaurants() {
     return _firestore
         .collection(COLLECTION_RESTAURANTS)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => RestaurantModel.fromFirestore(doc)).toList());
+        .map((snapshot) => snapshot.docs
+            .map((doc) => RestaurantModel.fromFirestore(doc))
+            .toList());
   }
 
   Future<RestaurantModel?> getRestaurantById(String restaurantId) async {
     try {
-      DocumentSnapshot doc =
-          await _firestore.collection(COLLECTION_RESTAURANTS).doc(restaurantId).get();
+      DocumentSnapshot doc = await _firestore
+          .collection(COLLECTION_RESTAURANTS)
+          .doc(restaurantId)
+          .get();
       if (doc.exists) return RestaurantModel.fromFirestore(doc);
       return null;
     } catch (e) {
@@ -296,7 +324,8 @@ Future<bool> restaurantExistsByEmail(String email) async {
           .where('adminUid', isEqualTo: adminUid)
           .limit(1)
           .get();
-      if (query.docs.isNotEmpty) return RestaurantModel.fromFirestore(query.docs.first);
+      if (query.docs.isNotEmpty)
+        return RestaurantModel.fromFirestore(query.docs.first);
       return null;
     } catch (e) {
       throw 'Failed to fetch restaurant: ${e.toString()}';
@@ -307,7 +336,10 @@ Future<bool> restaurantExistsByEmail(String email) async {
       String restaurantId, Map<String, dynamic> updates) async {
     try {
       updates['updatedAt'] = FieldValue.serverTimestamp();
-      await _firestore.collection(COLLECTION_RESTAURANTS).doc(restaurantId).update(updates);
+      await _firestore
+          .collection(COLLECTION_RESTAURANTS)
+          .doc(restaurantId)
+          .update(updates);
       print("✅ Restaurant updated successfully.");
     } catch (e) {
       throw 'Failed to update restaurant: ${e.toString()}';
@@ -316,7 +348,10 @@ Future<bool> restaurantExistsByEmail(String email) async {
 
   Future<void> deleteRestaurant(String restaurantId) async {
     try {
-      await _firestore.collection(COLLECTION_RESTAURANTS).doc(restaurantId).delete();
+      await _firestore
+          .collection(COLLECTION_RESTAURANTS)
+          .doc(restaurantId)
+          .delete();
       print("✅ Restaurant deleted successfully.");
     } catch (e) {
       throw 'Failed to delete restaurant: ${e.toString()}';

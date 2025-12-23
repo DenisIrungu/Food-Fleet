@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:foodfleet/controllers/restaurant_controller.dart';
 import 'package:foodfleet/models/restaurant_model.dart';
+import 'package:foodfleet/models/user_model.dart'; // New import for UserModel
+import 'package:foodfleet/services/database_service.dart'; // New import for fetching user data
 import 'package:foodfleet/utils/routes.dart';
 
 class ManageRestaurants extends StatelessWidget {
@@ -185,72 +187,107 @@ class _ManageRestaurantsViewState extends State<ManageRestaurantsView> {
     RestaurantModel restaurant,
     ColorScheme colorScheme,
   ) {
-    return Card(
-      color: colorScheme.secondary,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Align(
-                alignment: Alignment.topRight,
-                child: IconButton(
-                  onPressed: () {
-                    context
-                        .read<RestaurantController>()
-                        .deleteRestaurant(restaurant);
-                  },
-                  icon: const Icon(Icons.delete, color: Colors.redAccent),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Center(
-                child: CircleAvatar(
-                  radius: 35,
-                  backgroundColor: colorScheme.onSecondary.withOpacity(0.2),
-                  backgroundImage: restaurant.imageUrl != null
-                      ? NetworkImage(restaurant.imageUrl!)
-                      : null,
-                  child: restaurant.imageUrl == null
-                      ? Icon(Icons.restaurant,
-                          color: colorScheme.tertiary, size: 40)
-                      : null,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: Text(
-                  restaurant.name,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: colorScheme.tertiary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text("📍 ${restaurant.address}"),
-              Text("☎ ${restaurant.phone}"),
-              Text("✉ ${restaurant.email}"),
-              const SizedBox(height: 6),
-              Text(
-                "Status: ${restaurant.status}",
-                style: TextStyle(
-                  color: restaurant.status == 'active'
-                      ? Colors.greenAccent
-                      : Colors.redAccent,
-                ),
-              ),
-            ],
+    return FutureBuilder<UserModel?>(
+      future: DatabaseService().getUserData(
+          restaurant.adminUid), // Fetch admin user for profile picture
+      builder: (context, snapshot) {
+        String? profilePictureUrl;
+        String initial =
+            restaurant.name.isNotEmpty ? restaurant.name[0].toUpperCase() : 'R';
+
+        if (snapshot.hasData) {
+          final user = snapshot.data;
+          profilePictureUrl = user?.profilePictureUrl;
+          initial = user?.restaurantName?.isNotEmpty == true
+              ? user!.restaurantName![0].toUpperCase()
+              : 'R';
+        }
+
+        return Card(
+          color: colorScheme.secondary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-        ),
-      ),
+          elevation: 4,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.white),
+                          onPressed: () {
+                            Navigator.pushNamed(
+                              context,
+                              CREATE_ADMIN,
+                              arguments: restaurant, // 👈 pass restaurant
+                            );
+                          },
+                        ),
+                        IconButton(
+                          icon:
+                              const Icon(Icons.delete, color: Colors.redAccent),
+                          onPressed: () {
+                            context
+                                .read<RestaurantController>()
+                                .deleteRestaurant(restaurant);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Center(
+                    child: CircleAvatar(
+                      radius: 35,
+                      backgroundColor: colorScheme.onSecondary.withOpacity(0.2),
+                      backgroundImage: profilePictureUrl != null
+                          ? NetworkImage(profilePictureUrl)
+                          : null,
+                      child: profilePictureUrl == null
+                          ? Text(initial,
+                              style: const TextStyle(
+                                  fontSize: 40, color: Colors.white))
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Text(
+                      restaurant.name,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: colorScheme.tertiary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text("📍 ${restaurant.address}"),
+                  Text("☎ ${restaurant.phone}"),
+                  Text("✉ ${restaurant.email}"),
+                  const SizedBox(height: 6),
+                  Text(
+                    "Status: ${restaurant.status}",
+                    style: TextStyle(
+                      color: restaurant.status == 'active'
+                          ? Colors.greenAccent
+                          : Colors.redAccent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
