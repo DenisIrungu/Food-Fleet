@@ -1,70 +1,53 @@
 import 'package:flutter/material.dart';
-import 'package:foodfleet/services/auth_service.dart';
-import 'package:foodfleet/utils/routes.dart';
+import 'widgets/sidebar.dart';
+import 'widgets/top_bar.dart';
+import 'widgets/status_banner.dart';
+import 'widgets/stats_grid.dart';
+import 'widgets/quick_actions.dart';
+import 'widgets/todays_summary.dart';
+import 'widgets/recent_orders.dart';
 
 class RestaurantDashboard extends StatelessWidget {
   const RestaurantDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final AuthService authService = AuthService();
     final colors = Theme.of(context).colorScheme;
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= 1000;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Restaurant Dashboard'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await authService.signOut();
-
-              if (!context.mounted) return;
-
-              // 🔐 Clear navigation stack and go to login
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                LOGIN_ROUTE,
-                (route) => false,
-              );
-            },
+      backgroundColor: colors.surface,
+      body: Row(
+        children: [
+          if (isDesktop) Sidebar(colors: colors),
+          Expanded(
+            child: Column(
+              children: [
+                TopBar(colors: colors),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        StatusBanner(colors: colors),
+                        const SizedBox(height: 20),
+                        StatsGrid(width: width),
+                        const SizedBox(height: 24),
+                        const QuickActions(),
+                        const SizedBox(height: 24),
+                        const TodaysSummary(),
+                        const SizedBox(height: 24),
+                        RecentOrders(colors: colors),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              height: 120,
-              width: 120,
-              decoration: BoxDecoration(
-                color: colors.secondary.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(
-                Icons.restaurant,
-                size: 70,
-                color: colors.tertiary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Welcome, Restaurant!',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colors.onSurface,
-                  ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Manage your menu and orders here',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: colors.onSurface.withOpacity(0.7),
-                  ),
-            ),
-          ],
-        ),
       ),
     );
   }
