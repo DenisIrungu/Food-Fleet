@@ -1,6 +1,9 @@
 // lib/screens/super_admin/dashboard_overview.dart
 import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:foodfleet/models/user_model.dart';
+import '/services/database_service.dart'; // Adjust path if needed
 
 class DashboardOverview extends StatelessWidget {
   const DashboardOverview({super.key});
@@ -15,14 +18,6 @@ class DashboardOverview extends StatelessWidget {
     if (size.width > 1200) {
       crossAxisCount = 4;
     } else if (size.width > 900) crossAxisCount = 3;
-
-    // Static summary data (placeholder values)
-    final List<_SummaryItem> items = [
-      _SummaryItem('Total Restaurants', '24', Icons.restaurant),
-      _SummaryItem('Total Customers', '1,420', Icons.people),
-      _SummaryItem('Active Orders', '58', Icons.delivery_dining),
-      _SummaryItem('Completed Orders', '3,410', Icons.check_circle_outline),
-    ];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -50,22 +45,61 @@ class DashboardOverview extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // Summary cards grid
-          LayoutBuilder(builder: (context, constraints) {
-            // Use GridView.builder inside a fixed-height container would be messy in scroll view;
-            // Use Wrap to get responsive wrapping behaviour
-            final double itemWidth = (constraints.maxWidth - (16 * (crossAxisCount - 1))) / crossAxisCount;
-            return Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              children: items
-                  .map((it) => SizedBox(
-                        width: itemWidth < 260 ? constraints.maxWidth : itemWidth,
-                        child: _SummaryCard(item: it),
-                      ))
-                  .toList(),
-            );
-          }),
+          // Summary cards grid with real-time Total Restaurants
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('restaurants')
+                .snapshots(),
+            builder: (context, snapshot) {
+              String totalRestaurants = '0';
+              String activeRestaurants = '0';
+              String inactiveRestaurants = '0';
+
+              if (snapshot.hasData) {
+                final docs = snapshot.data!.docs;
+
+                totalRestaurants = docs.length.toString();
+
+                final activeCount =
+                    docs.where((doc) => doc['status'] == 'active').length;
+
+                final inactiveCount =
+                    docs.where((doc) => doc['status'] == 'inactive').length;
+
+                activeRestaurants = activeCount.toString();
+                inactiveRestaurants = inactiveCount.toString();
+              }
+
+              // Static summary data except for Total Restaurants
+              final List<_SummaryItem> items = [
+                _SummaryItem(
+                    'Total Restaurants', totalRestaurants, Icons.restaurant),
+                _SummaryItem('Total Customers', '1,420', Icons.people),
+                _SummaryItem('Active Restaurants', activeRestaurants,
+                    Icons.delivery_dining),
+                _SummaryItem('Inactive Restaurants', inactiveRestaurants,
+                    Icons.check_circle_outline),
+              ];
+
+              return LayoutBuilder(builder: (context, constraints) {
+                final double itemWidth =
+                    (constraints.maxWidth - (16 * (crossAxisCount - 1))) /
+                        crossAxisCount;
+                return Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  children: items
+                      .map((it) => SizedBox(
+                            width: itemWidth < 260
+                                ? constraints.maxWidth
+                                : itemWidth,
+                            child: _SummaryCard(item: it),
+                          ))
+                      .toList(),
+                );
+              });
+            },
+          ),
 
           const SizedBox(height: 28),
 
@@ -83,14 +117,19 @@ class DashboardOverview extends StatelessWidget {
           LayoutBuilder(
             builder: (context, constraints) {
               final bool sideBySide = constraints.maxWidth >= 800;
-              final double chartWidth = sideBySide ? (constraints.maxWidth - 16) / 2 : constraints.maxWidth;
+              final double chartWidth = sideBySide
+                  ? (constraints.maxWidth - 16) / 2
+                  : constraints.maxWidth;
               return sideBySide
                   ? Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(width: chartWidth, child: _RestaurantActivityCard()),
+                        SizedBox(
+                            width: chartWidth,
+                            child: _RestaurantActivityCard()),
                         const SizedBox(width: 16),
-                        SizedBox(width: chartWidth, child: _WeeklyCustomersCard()),
+                        SizedBox(
+                            width: chartWidth, child: _WeeklyCustomersCard()),
                       ],
                     )
                   : Column(
@@ -176,20 +215,29 @@ class _SummaryCard extends StatelessWidget {
 /// -------------------- Restaurant Activity Card (Bar Chart) --------------------
 class _RestaurantActivityCard extends StatefulWidget {
   @override
-  State<_RestaurantActivityCard> createState() => _RestaurantActivityCardState();
+  State<_RestaurantActivityCard> createState() =>
+      _RestaurantActivityCardState();
 }
 
-class _RestaurantActivityCardState extends State<_RestaurantActivityCard> with SingleTickerProviderStateMixin {
+class _RestaurantActivityCardState extends State<_RestaurantActivityCard>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   // Mock data: active vs inactive counts per category (here only one group for simplicity)
-  final List<double> activeData = [8, 10, 9, 12, 11]; // sample active restaurants per day
+  final List<double> activeData = [
+    8,
+    10,
+    9,
+    12,
+    11
+  ]; // sample active restaurants per day
   final List<double> inactiveData = [2, 1, 3, 1, 2]; // sample inactive per day
   final List<String> labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900));
     // trigger animation on build
     _controller.forward();
   }
@@ -227,10 +275,13 @@ class _RestaurantActivityCardState extends State<_RestaurantActivityCard> with S
           children: [
             Text('Restaurant Activity Summary',
                 style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w600, color: colors.tertiary)),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: colors.tertiary)),
             const SizedBox(height: 8),
             Text('Active vs Inactive (last 5 working days)',
-                style: TextStyle(fontSize: 12, color: colors.onSecondary.withOpacity(0.85))),
+                style: TextStyle(
+                    fontSize: 12, color: colors.onSecondary.withOpacity(0.85))),
             const SizedBox(height: 12),
             SizedBox(
               height: 180,
@@ -268,7 +319,8 @@ class _RestaurantActivityCardState extends State<_RestaurantActivityCard> with S
                             ),
                             const SizedBox(height: 8),
                             Text(labels[i],
-                                style: TextStyle(fontSize: 12, color: colors.tertiary)),
+                                style: TextStyle(
+                                    fontSize: 12, color: colors.tertiary)),
                           ],
                         ),
                       );
@@ -294,9 +346,16 @@ class _RestaurantActivityCardState extends State<_RestaurantActivityCard> with S
   Widget _legendDot(Color color, String label) {
     return Row(
       children: [
-        Container(width: 12, height: 12, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6))),
+        Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+                color: color, borderRadius: BorderRadius.circular(6))),
         const SizedBox(width: 6),
-        Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSecondary)),
+        Text(label,
+            style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSecondary)),
       ],
     );
   }
@@ -308,7 +367,8 @@ class _WeeklyCustomersCard extends StatefulWidget {
   State<_WeeklyCustomersCard> createState() => _WeeklyCustomersCardState();
 }
 
-class _WeeklyCustomersCardState extends State<_WeeklyCustomersCard> with SingleTickerProviderStateMixin {
+class _WeeklyCustomersCardState extends State<_WeeklyCustomersCard>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   // Mock weekly customer data (7 days)
   final List<double> data = [12, 18, 20, 27, 22, 30, 35];
@@ -317,7 +377,8 @@ class _WeeklyCustomersCardState extends State<_WeeklyCustomersCard> with SingleT
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900));
     _controller.forward();
   }
 
@@ -344,10 +405,14 @@ class _WeeklyCustomersCardState extends State<_WeeklyCustomersCard> with SingleT
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Weekly New Customers',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colors.tertiary)),
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: colors.tertiary)),
             const SizedBox(height: 8),
             Text('Customer growth rate over the last 7 days',
-                style: TextStyle(fontSize: 12, color: colors.onSecondary.withOpacity(0.85))),
+                style: TextStyle(
+                    fontSize: 12, color: colors.onSecondary.withOpacity(0.85))),
             const SizedBox(height: 12),
             SizedBox(
               height: 220,
@@ -356,7 +421,8 @@ class _WeeklyCustomersCardState extends State<_WeeklyCustomersCard> with SingleT
                 builder: (context, child) {
                   return CustomPaint(
                     painter: _LineChartPainter(
-                      animationPercent: Curves.easeOut.transform(_controller.value),
+                      animationPercent:
+                          Curves.easeOut.transform(_controller.value),
                       data: data,
                       labels: labels,
                       lineColor: colors.tertiary,
@@ -397,9 +463,17 @@ class _LineChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paintAxis = Paint()..color = axisColor..strokeWidth = 1;
-    final paintLine = Paint()..color = lineColor..strokeWidth = 2..style = PaintingStyle.stroke..strokeCap = StrokeCap.round;
-    final paintFill = Paint()..color = fillColor..style = PaintingStyle.fill;
+    final paintAxis = Paint()
+      ..color = axisColor
+      ..strokeWidth = 1;
+    final paintLine = Paint()
+      ..color = lineColor
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final paintFill = Paint()
+      ..color = fillColor
+      ..style = PaintingStyle.fill;
 
     final double leftPadding = 30;
     final double bottomPadding = 30;
@@ -410,7 +484,8 @@ class _LineChartPainter extends CustomPainter {
     final int gridLines = 4;
     for (int i = 0; i <= gridLines; i++) {
       final dy = 12 + (h / gridLines) * i;
-      canvas.drawLine(Offset(leftPadding, dy), Offset(leftPadding + w, dy), paintAxis);
+      canvas.drawLine(
+          Offset(leftPadding, dy), Offset(leftPadding + w, dy), paintAxis);
     }
 
     // Map data to points
@@ -460,7 +535,8 @@ class _LineChartPainter extends CustomPainter {
     // Draw labels on X axis
     final textPainter = TextPainter(textDirection: TextDirection.ltr);
     for (int i = 0; i < labels.length; i++) {
-      final tp = TextSpan(text: labels[i], style: TextStyle(color: axisColor, fontSize: 10));
+      final tp = TextSpan(
+          text: labels[i], style: TextStyle(color: axisColor, fontSize: 10));
       textPainter.text = tp;
       textPainter.layout();
       final dx = leftPadding + (stepX * i) - textPainter.width / 2;
@@ -471,6 +547,7 @@ class _LineChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _LineChartPainter oldDelegate) {
-    return oldDelegate.animationPercent != animationPercent || oldDelegate.data != data;
+    return oldDelegate.animationPercent != animationPercent ||
+        oldDelegate.data != data;
   }
 }
