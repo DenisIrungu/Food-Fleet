@@ -127,7 +127,7 @@ class RestaurantController extends ChangeNotifier {
       await _databaseService.deleteRestaurant(restaurant.id);
 
       // Step 2️⃣: Delete admin user (if exists)
-      await _databaseService.deleteUser(restaurant.adminUid!);
+      await _databaseService.deleteUser(restaurant.adminUid);
       print('✅ Deleted linked admin user');
     
       Fluttertoast.showToast(

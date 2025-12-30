@@ -31,8 +31,8 @@ class _CreateAdminPageState extends State<CreateAdmin> {
 
   bool _isLoading = false;
   String? _emailError;
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
+  final bool _obscurePassword = true;
+  final bool _obscureConfirmPassword = true;
   File? _selectedImage;
 
   RestaurantModel? _editingRestaurant;

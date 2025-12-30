@@ -1,14 +1,13 @@
-// Updated database_service.dart
 import 'dart:io'; // For File
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart'; // New import for Storage
 import '/models/user_model.dart';
 import '/models/restaurant_model.dart';
 import '/utils/constants.dart';
+import 'storage_service.dart'; // Import StorageService
 
 class DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance; // New for Storage
 
   // ============================================
   // USER MANAGEMENT
@@ -49,21 +48,46 @@ class DatabaseService {
       rethrow;
     }
   }
-
-  // ✅ New: Upload and update profile picture for user (e.g., restaurant admin)
+  // MOBILE
   Future<String?> updateProfilePicture(String uid, File imageFile) async {
     try {
-      // Upload to Storage
-      final ref = _storage.ref('profile_pictures/$uid.jpg');
-      await ref.putFile(imageFile);
-      final url = await ref.getDownloadURL();
+      final storageService = StorageService();
+      final url = await storageService.uploadProfilePicture(uid, imageFile);
+      if (url == null) return null;
 
-      // Update Firestore user doc
-      await updateUser(uid, {'profilePictureUrl': url});
+      await updateUser(uid, {
+        'profilePictureUrl': url,
+        'profilePictureUpdatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // ❌ DO NOT CLEANUP HERE
       print("✅ Profile picture uploaded and updated.");
       return url;
     } catch (e) {
       print("❌ Error uploading profile picture: $e");
+      return null;
+    }
+  }
+
+// WEB
+  Future<String?> updateProfilePictureWeb(
+    String uid,
+    Uint8List imageBytes,
+  ) async {
+    try {
+      final storageService = StorageService();
+      final url = await storageService.uploadProfilePictureWeb(uid, imageBytes);
+      if (url == null) return null;
+
+      await updateUser(uid, {
+        'profilePictureUrl': url,
+        'profilePictureUpdatedAt': FieldValue.serverTimestamp(),
+      });
+
+      print("✅ Web profile picture uploaded.");
+      return url;
+    } catch (e) {
+      print("❌ Web upload failed: $e");
       return null;
     }
   }
@@ -324,8 +348,9 @@ class DatabaseService {
           .where('adminUid', isEqualTo: adminUid)
           .limit(1)
           .get();
-      if (query.docs.isNotEmpty)
+      if (query.docs.isNotEmpty) {
         return RestaurantModel.fromFirestore(query.docs.first);
+      }
       return null;
     } catch (e) {
       throw 'Failed to fetch restaurant: ${e.toString()}';
@@ -367,5 +392,33 @@ class DatabaseService {
       print("❌ Failed to count restaurants: $e");
       return 0;
     }
+  }
+
+  Stream<RestaurantModel?> streamRestaurantByAdminUid(String adminUid) {
+    return _firestore
+        .collection(COLLECTION_RESTAURANTS)
+        .where('adminUid', isEqualTo: adminUid)
+        .limit(1)
+        .snapshots()
+        .map((snapshot) {
+      if (snapshot.docs.isNotEmpty) {
+        return RestaurantModel.fromFirestore(snapshot.docs.first);
+      }
+      return null;
+    });
+  }
+
+  // Add this method to your DatabaseService class
+  Stream<RestaurantModel?> streamRestaurantById(String restaurantId) {
+    return _firestore
+        .collection(COLLECTION_RESTAURANTS)
+        .doc(restaurantId)
+        .snapshots()
+        .map((doc) {
+      if (doc.exists) {
+        return RestaurantModel.fromFirestore(doc);
+      }
+      return null;
+    });
   }
 }

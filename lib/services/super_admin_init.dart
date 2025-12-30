@@ -10,7 +10,7 @@ class SuperAdminInitService {
   Future<void> initializeSuperAdmin() async {
     try {
       print("👤 Initializing Super Admin...");
-      
+
       // 1. Check if super admin already exists in Firestore
       bool exists = await _databaseService.superAdminExists();
       if (exists) {
@@ -22,7 +22,8 @@ class SuperAdminInitService {
 
       try {
         // 2. Try creating super admin in Firebase Auth
-        UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        UserCredential userCredential =
+            await _auth.createUserWithEmailAndPassword(
           email: SUPER_ADMIN_EMAIL,
           password: SUPER_ADMIN_PASSWORD,
         );
@@ -37,10 +38,12 @@ class SuperAdminInitService {
         print("✅ Super admin created in Auth + Firestore.");
       } on FirebaseAuthException catch (e) {
         if (e.code == 'email-already-in-use') {
-          print("ℹ️ Super admin already exists in Firebase Auth. Syncing Firestore...");
+          print(
+              "ℹ️ Super admin already exists in Firebase Auth. Syncing Firestore...");
 
           // Sign in temporarily to get UID
-          UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+          UserCredential userCredential =
+              await _auth.signInWithEmailAndPassword(
             email: SUPER_ADMIN_EMAIL,
             password: SUPER_ADMIN_PASSWORD,
           );

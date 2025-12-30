@@ -1,67 +1,128 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as img;
 
 class StorageService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final ImagePicker _picker = ImagePicker();
 
-  // Pick image from gallery
+  /* ------------------------------------------
+   PICK IMAGE
+  -------------------------------------------*/
+
   Future<XFile?> pickImageFromGallery() async {
     try {
-      final XFile? image = await _picker.pickImage(
+      return await _picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 1024,
         maxHeight: 1024,
         imageQuality: 85,
       );
-      return image;
     } catch (e) {
-      print('❌ Error picking image: $e');
+      debugPrint('❌ Image pick error: $e');
       return null;
     }
   }
 
-  // Upload restaurant logo or any image
-  Future<String?> uploadImage(
-    XFile imageFile, {
-    required String folderName,
-    required String fileId,
-  }) async {
+  /* ------------------------------------------
+   UPLOAD (MOBILE / DESKTOP)
+  -------------------------------------------*/
+
+  Future<String?> uploadProfilePicture(
+    String uid,
+    File imageFile,
+  ) async {
     try {
-      final fileExtension = imageFile.path.split('.').last;
-      final fileName =
-          '${fileId}_${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
-      final Reference ref = _storage.ref().child('$folderName/$fileName');
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      UploadTask uploadTask;
+      final ref = _storage.ref(
+        'profile_pictures/$uid/$timestamp.jpg',
+      );
 
-      if (kIsWeb) {
-        final bytes = await imageFile.readAsBytes();
-        uploadTask = ref.putData(bytes);
-      } else {
-        uploadTask = ref.putFile(File(imageFile.path));
+      final metadata = SettableMetadata(
+        contentType: 'image/jpeg',
+        cacheControl: 'public,max-age=3600',
+      );
+
+      await ref.putFile(imageFile, metadata);
+
+      final url = await ref.getDownloadURL();
+      debugPrint('✅ Profile image uploaded: $url');
+
+      return url;
+    } catch (e) {
+      debugPrint('❌ Upload failed: $e');
+      return null;
+    }
+  }
+
+  /* ------------------------------------------
+   UPLOAD (WEB) — FIXED & ANDROID SAFE
+  -------------------------------------------*/
+
+  Future<String?> uploadProfilePictureWeb(
+    String uid,
+    Uint8List imageBytes,
+  ) async {
+    try {
+      // ✅ Decode browser image
+      final decoded = img.decodeImage(imageBytes);
+      if (decoded == null) {
+        debugPrint('❌ Failed to decode web image');
+        return null;
       }
 
-      final TaskSnapshot snapshot = await uploadTask;
-      final String downloadUrl = await snapshot.ref.getDownloadURL();
+      // ✅ Re-encode as REAL JPEG
+      final jpegBytes = Uint8List.fromList(
+        img.encodeJpg(decoded, quality: 85),
+      );
 
-      print('✅ Image uploaded: $downloadUrl');
-      return downloadUrl;
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+      final ref = _storage.ref(
+        'profile_pictures/$uid/$timestamp.jpg',
+      );
+
+      final metadata = SettableMetadata(
+        contentType: 'image/jpeg',
+        cacheControl: 'public,max-age=3600',
+      );
+
+      await ref.putData(jpegBytes, metadata);
+
+      final url = await ref.getDownloadURL();
+      debugPrint('✅ Web image uploaded (re-encoded): $url');
+
+      return url;
     } catch (e) {
-      print('❌ Error uploading image: $e');
+      debugPrint('❌ Web upload failed: $e');
       return null;
     }
   }
 
-  // Specific helper for restaurant logos
-  Future<String?> uploadRestaurantLogo(
-      XFile imageFile, String restaurantId) async {
-    return await uploadImage(
-      imageFile,
-      folderName: 'restaurant_logos',
-      fileId: restaurantId,
-    );
+  /* ------------------------------------------
+   OPTIONAL CLEANUP (MANUAL ONLY)
+   ⚠️ DO NOT call during upload
+  -------------------------------------------*/
+
+  Future<void> cleanupOldProfilePictures(String uid) async {
+    try {
+      final folderRef = _storage.ref('profile_pictures/$uid');
+      final result = await folderRef.listAll();
+
+      if (result.items.length <= 1) return;
+
+      result.items.sort((a, b) => b.name.compareTo(a.name));
+
+      for (int i = 1; i < result.items.length; i++) {
+        await result.items[i].delete();
+        debugPrint('🗑️ Deleted old image: ${result.items[i].name}');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Cleanup failed: $e');
+    }
   }
 }

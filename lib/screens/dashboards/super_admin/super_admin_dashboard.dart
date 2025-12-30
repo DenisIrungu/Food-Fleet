@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:foodfleet/screens/dashboards/super_admin/settings.dart';
 import 'dashboard_overview.dart';
-import 'manage_restaurants.dart'; // ✅ Import your ManageRestaurants screen
+import 'manage_restaurants.dart'; 
 
 class SuperAdminDashboard extends StatefulWidget {
   const SuperAdminDashboard({super.key});
