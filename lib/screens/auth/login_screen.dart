@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:foodfleet/providers/restaurant_scope_provider.dart';
+import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../models/user_model.dart';
 import '../../utils/validators.dart';
@@ -29,7 +31,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // --- Handle Sign In ---
   Future<void> _handleSignIn() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
@@ -41,10 +42,30 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (user != null && mounted) {
+        // --- Handle first login password change ---
         if (user.firstLogin) {
           Navigator.pushReplacementNamed(context, CHANGE_PASSWORD_ROUTE);
           return;
         }
+
+        // --- SET RESTAURANT ID for restaurant admins ---
+        if (user.role == ROLE_RESTAURANT_ADMIN) {
+          final restaurantScope = context.read<RestaurantScope>();
+
+          if (user.restaurantId != null && user.restaurantId!.isNotEmpty) {
+            restaurantScope
+                .setRestaurant(user.restaurantId!); // ✅ sets restaurant ID
+          } else {
+            Fluttertoast.showToast(
+              msg: 'Restaurant ID not found for this admin.',
+              backgroundColor: Colors.red,
+              textColor: Colors.white,
+            );
+            return; // Stop navigation if restaurantId missing
+          }
+        }
+
+        // --- Navigate based on role ---
         _navigateBasedOnRole(user.role);
       }
     } catch (e) {
@@ -183,8 +204,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Theme.of(context).colorScheme.primary,
                               ),
                               onPressed: () {
-                                setState(() =>
-                                    _obscurePassword = !_obscurePassword);
+                                setState(
+                                    () => _obscurePassword = !_obscurePassword);
                               },
                             ),
                             border: OutlineInputBorder(
@@ -197,8 +218,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed:
-                                _isLoading ? null : () {/* TODO reset password */},
+                            onPressed: _isLoading
+                                ? null
+                                : () {/* TODO reset password */},
                             child: Text(
                               "Forgot your Password?",
                               style: TextStyle(
@@ -219,8 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               backgroundColor:
                                   Theme.of(context).colorScheme.primary,
                               foregroundColor: Colors.white,
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 16),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -266,8 +287,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: Text(
                                 "Sign Up",
                                 style: TextStyle(
-                                  color:
-                                      Theme.of(context).colorScheme.primary,
+                                  color: Theme.of(context).colorScheme.primary,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -307,8 +327,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     // TODO sign in with Google
                                   },
                             style: OutlinedButton.styleFrom(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 14),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -339,8 +358,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     // TODO sign in with Apple
                                   },
                             style: OutlinedButton.styleFrom(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 14),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),

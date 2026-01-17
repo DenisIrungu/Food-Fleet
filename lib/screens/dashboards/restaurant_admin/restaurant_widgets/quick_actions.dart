@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:foodfleet/utils/routes.dart';
 
 class QuickActions extends StatelessWidget {
   const QuickActions({super.key});
@@ -24,11 +25,38 @@ class QuickActions extends StatelessWidget {
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
               childAspectRatio: 2.5,
-              children: const [
-                ActionBtn(Icons.add, 'Add Menu Item'),
-                ActionBtn(Icons.receipt, 'View Orders'),
-                ActionBtn(Icons.menu_book, 'Manage Menu'),
-                ActionBtn(Icons.store, 'Edit Restaurant Info'),
+              children: [
+                ActionBtn(
+                  Icons.add,
+                  'Add Menu Item',
+                  onTap: () {
+                    // later
+                  },
+                ),
+                ActionBtn(
+                  Icons.receipt,
+                  'View Orders',
+                  onTap: () {
+                    // later
+                  },
+                ),
+                ActionBtn(
+                  Icons.menu_book,
+                  'Manage Menu',
+                  onTap: () {
+                    Navigator.pushNamed(
+                      context,
+                      MENU_DASHBOARD_ROUTE,
+                    );
+                  },
+                ),
+                ActionBtn(
+                  Icons.store,
+                  'Edit Restaurant Info',
+                  onTap: () {
+                    // later
+                  },
+                ),
               ],
             );
           },
@@ -41,12 +69,19 @@ class QuickActions extends StatelessWidget {
 class ActionBtn extends StatelessWidget {
   final IconData icon;
   final String label;
-  const ActionBtn(this.icon, this.label, {super.key});
+  final VoidCallback? onTap;
+
+  const ActionBtn(
+    this.icon,
+    this.label, {
+    this.onTap,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
     return ElevatedButton.icon(
-      onPressed: () {},
+      onPressed: onTap,
       icon: Icon(icon),
       label: Text(label),
       style: ElevatedButton.styleFrom(

@@ -5,14 +5,14 @@ import 'package:foodfleet/models/user_model.dart';
 import 'package:foodfleet/services/auth_service.dart';
 import 'package:foodfleet/services/database_service.dart';
 import 'package:foodfleet/utils/routes.dart';
-import 'widgets/active_badge.dart';
-import 'widgets/restaurant_drawer.dart';
-import 'widgets/status_banner.dart';
-import 'widgets/stats_grid.dart';
-import 'widgets/quick_actions.dart';
-import 'widgets/todays_summary.dart';
-import 'widgets/recent_orders.dart';
-import 'widgets/profile_picture.dart';
+import 'restaurant_widgets/active_badge.dart';
+import 'restaurant_widgets/restaurant_drawer.dart';
+import 'restaurant_widgets/status_banner.dart';
+import 'restaurant_widgets/stats_grid.dart';
+import 'restaurant_widgets/quick_actions.dart';
+import 'restaurant_widgets/todays_summary.dart';
+import 'restaurant_widgets/recent_orders.dart';
+import 'restaurant_widgets/profile_picture.dart';
 
 class RestaurantDashboard extends StatefulWidget {
   const RestaurantDashboard({super.key});
