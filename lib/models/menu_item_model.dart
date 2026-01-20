@@ -2,12 +2,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MenuItemModel {
   final String id;
+
+  /// Still stored for reference & analytics
   final String restaurantId;
   final String categoryId;
 
   final String name;
   final String? description;
-  final String imageUrl; // REQUIRED
+
+  /// Image may be uploaded AFTER creation
+  final String imageUrl;
 
   final double price;
   final bool isAvailable;
@@ -27,15 +31,16 @@ class MenuItemModel {
     required this.categoryId,
     required this.name,
     this.description,
-    required this.imageUrl,
+    this.imageUrl = '', // ✅ SAFE DEFAULT
     required this.price,
-    required this.isAvailable,
-    required this.isAddon,
-    required this.addonGroupIds,
-    required this.position,
-    required this.createdAt,
-    required this.updatedAt,
-  });
+    this.isAvailable = true,
+    this.isAddon = false,
+    this.addonGroupIds = const [],
+    this.position = 0,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  })  : createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
   // ======================================================
   // Firestore → Model
@@ -85,9 +90,12 @@ class MenuItemModel {
   }
 
   // ======================================================
-  // Safe updates
+  // CopyWith (SAFE UPDATES)
   // ======================================================
   MenuItemModel copyWith({
+    String? id,
+    String? restaurantId,
+    String? categoryId,
     String? name,
     String? description,
     String? imageUrl,
@@ -96,11 +104,9 @@ class MenuItemModel {
     bool? isAddon,
     List<String>? addonGroupIds,
     int? position,
-    String? categoryId,
-    String? restaurantId,
   }) {
     return MenuItemModel(
-      id: id,
+      id: id ?? this.id,
       restaurantId: restaurantId ?? this.restaurantId,
       categoryId: categoryId ?? this.categoryId,
       name: name ?? this.name,
@@ -112,7 +118,7 @@ class MenuItemModel {
       addonGroupIds: addonGroupIds ?? this.addonGroupIds,
       position: position ?? this.position,
       createdAt: createdAt,
-      updatedAt: DateTime.now(),
+      updatedAt: DateTime.now(), 
     );
   }
 }

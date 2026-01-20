@@ -54,6 +54,9 @@ class CategoriesScreen extends StatelessWidget {
                 onPressed: () => _openCategoryForm(context),
                 icon: const Icon(Icons.add),
                 label: const Text('Add Category'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF0F2A12),
+                ),
               ),
             ),
         ],
