@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:foodfleet/Theme/theme_provider.dart';
-import 'package:foodfleet/screens/dashboards/restaurant_admin/manage_menu/addons/addon_groups_screen.dart';
+import 'package:foodfleet/screens/dashboards/restaurant_admin/manage_menu/addon_group/addon_groups_screen.dart';
 import 'package:foodfleet/screens/dashboards/restaurant_admin/manage_menu/categories/categories_screen.dart';
 import 'package:foodfleet/screens/dashboards/restaurant_admin/manage_menu/menu_dashboard.dart';
 import 'package:foodfleet/screens/dashboards/restaurant_admin/manage_menu/menu_items/menu_items_screen.dart';
@@ -54,11 +54,21 @@ class AppView extends StatelessWidget {
         // ===============================
         // ✅ MENU MANAGEMENT (NEW)
         // ===============================
-        MENU_DASHBOARD_ROUTE: (context) => const MenuDashboard(),
+        MENU_DASHBOARD_ROUTE: (context) {
+          final restaurantId = context.read<RestaurantScope>().restaurantId;
+          if (restaurantId == null || restaurantId.isEmpty) {
+            // Fallback - should not happen if RestaurantScope is set properly
+            return const Scaffold(
+              body: Center(child: Text('Restaurant not set')),
+            );
+          }
+          return MenuDashboard(restaurantId: restaurantId);
+        },
         MANAGE_CATEGORIES_ROUTE: (context) => const CategoriesScreen(),
         MANAGE_MENU_ITEMS_ROUTE: (context) => const MenuItemsScreen(),
-        MANAGE_ADDONS_ROUTE: (context) => const AddonGroupsScreen(),
-        
+        MANAGE_ADDONS_ROUTE: (context) => const AddonGroupsScreen(
+              restaurantId: '',
+            ),
       },
     );
   }

@@ -268,7 +268,8 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Deleted menu item: ${item.name}'),
+              content: Text('Deleted menu item: ${item.name}',
+                  style: TextStyle(color: Colors.white)),
               backgroundColor: Colors.green,
             ),
           );

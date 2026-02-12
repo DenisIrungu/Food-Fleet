@@ -25,11 +25,11 @@ class AddonService {
       .doc(restaurantId)
       .collection('menu_items');
 
-  /* ----------------------------------------------------
-     ADDON GROUPS (ADMIN ONLY)
-  ---------------------------------------------------- */
+  /* ====================================================
+     ADDON GROUPS (ADMIN)
+  ==================================================== */
 
-  /// ADMIN ONLY: Get all addon groups ordered by position
+  /// Get all addon groups (Future)
   Future<List<AddonGroupModel>> getAddonGroupsForAdmin() async {
     final snapshot = await _addonGroupsRef.orderBy('position').get();
 
@@ -38,7 +38,16 @@ class AddonService {
         .toList();
   }
 
-  /// ADMIN ONLY: Get addon groups by IDs
+  /// Stream all addon groups (LIVE)
+  Stream<List<AddonGroupModel>> streamAddonGroupsForAdmin() {
+    return _addonGroupsRef.orderBy('position').snapshots().map(
+          (snapshot) => snapshot.docs
+              .map((doc) => AddonGroupModel.fromFirestore(doc))
+              .toList(),
+        );
+  }
+
+  /// Get addon groups by IDs (Future - batched safe)
   Future<List<AddonGroupModel>> getAddonGroupsByIdsForAdmin(
     List<String> addonGroupIds,
   ) async {
@@ -46,7 +55,6 @@ class AddonService {
 
     final List<AddonGroupModel> results = [];
 
-    // Firestore whereIn limit = 10
     for (int i = 0; i < addonGroupIds.length; i += 10) {
       final batchIds = addonGroupIds.skip(i).take(10).toList();
 
@@ -59,71 +67,25 @@ class AddonService {
       );
     }
 
-    // Ensure correct ordering after batching
     return results..sort((a, b) => a.position.compareTo(b.position));
   }
 
-  /// ADMIN ONLY: Create addon group
+  /// Create addon group
   Future<void> createAddonGroup(AddonGroupModel group) async {
     await _addonGroupsRef.add(group.toMap());
   }
 
-  /// ADMIN ONLY: Update addon group
+  /// Update addon group
   Future<void> updateAddonGroup(AddonGroupModel group) async {
     await _addonGroupsRef.doc(group.id).update(group.toMap());
   }
 
-  /// ADMIN ONLY: Delete addon group (hard delete)
+  /// Delete addon group
   Future<void> deleteAddonGroup(String addonGroupId) async {
     await _addonGroupsRef.doc(addonGroupId).delete();
   }
 
-  /* ----------------------------------------------------
-     ADDON ITEMS
-     (Menu items where isAddon == true)
-  ---------------------------------------------------- */
-
-  /// Get addon items by IDs (used when rendering menu items)
-  Future<List<MenuItemModel>> getAddonItemsByIds(
-    List<String> addonItemIds,
-  ) async {
-    if (addonItemIds.isEmpty) return [];
-
-    final List<MenuItemModel> results = [];
-
-    // Firestore whereIn limit = 10
-    for (int i = 0; i < addonItemIds.length; i += 10) {
-      final batchIds = addonItemIds.skip(i).take(10).toList();
-
-      final snapshot = await _menuItemsRef
-          .where(FieldPath.documentId, whereIn: batchIds)
-          .get();
-
-      results.addAll(
-        snapshot.docs.map((doc) => MenuItemModel.fromFirestore(doc)),
-      );
-    }
-
-    return results..sort((a, b) => a.position.compareTo(b.position));
-  }
-
-  /// ADMIN ONLY: Get all addon items
-  Future<List<MenuItemModel>> getAllAddonItemsForAdmin() async {
-    final snapshot = await _menuItemsRef
-        .where('isAddon', isEqualTo: true)
-        .orderBy('position')
-        .get();
-
-    return snapshot.docs
-        .map((doc) => MenuItemModel.fromFirestore(doc))
-        .toList();
-  }
-
-  /* ----------------------------------------------------
-     UTILITIES (ADMIN ONLY)
-  ---------------------------------------------------- */
-
-  /// Update addon group positions (drag & drop ordering)
+  /// Update addon group positions (drag & drop groups)
   Future<void> updateAddonGroupPositions(
     Map<String, int> positions,
   ) async {
@@ -141,6 +103,123 @@ class AddonService {
 
     await batch.commit();
   }
+
+  /// Update addon item order inside a group (drag inside group)
+  Future<void> updateAddonGroupItemOrder({
+    required String groupId,
+    required List<String> newOrder,
+  }) async {
+    await _addonGroupsRef.doc(groupId).update({
+      'addonItemIds': newOrder,
+      'updatedAt': Timestamp.now(),
+    });
+  }
+
+  /* ====================================================
+     ADDON ITEMS (Menu items where isAddon == true)
+  ==================================================== */
+
+  /// Get addon items by IDs (Future - batched safe)
+  Future<List<MenuItemModel>> getAddonItemsByIds(
+    List<String> addonItemIds,
+  ) async {
+    if (addonItemIds.isEmpty) return [];
+
+    final List<MenuItemModel> results = [];
+
+    for (int i = 0; i < addonItemIds.length; i += 10) {
+      final batchIds = addonItemIds.skip(i).take(10).toList();
+
+      final snapshot = await _menuItemsRef
+          .where(FieldPath.documentId, whereIn: batchIds)
+          .get();
+
+      results.addAll(
+        snapshot.docs.map((doc) => MenuItemModel.fromFirestore(doc)),
+      );
+    }
+
+    return results..sort((a, b) => a.position.compareTo(b.position));
+  }
+
+  /// Stream addon items by IDs (LIVE)
+  Stream<List<MenuItemModel>> streamAddonItemsByIds(
+    List<String> addonItemIds,
+  ) {
+    if (addonItemIds.isEmpty) {
+      return Stream.value([]);
+    }
+
+    return _menuItemsRef
+        .where(FieldPath.documentId, whereIn: addonItemIds)
+        .snapshots()
+        .map((snapshot) {
+      final items =
+          snapshot.docs.map((doc) => MenuItemModel.fromFirestore(doc)).toList();
+
+      // Maintain group order
+      items.sort((a, b) => addonItemIds.indexOf(a.id).compareTo(
+            addonItemIds.indexOf(b.id),
+          ));
+
+      return items;
+    });
+  }
+
+  /// Get all addon items (ADMIN)
+  Future<List<MenuItemModel>> getAllAddonItemsForAdmin() async {
+    final snapshot =
+        await _menuItemsRef.where('isAddon', isEqualTo: true).get();
+
+    final items =
+        snapshot.docs.map((doc) => MenuItemModel.fromFirestore(doc)).toList();
+
+    items.sort((a, b) => a.position.compareTo(b.position));
+
+    return items;
+  }
+
+  /// Stream all addon items (ADMIN LIVE)
+  Stream<List<MenuItemModel>> streamAllAddonItemsForAdmin() {
+    return _menuItemsRef
+        .where('isAddon', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) {
+      final items =
+          snapshot.docs.map((doc) => MenuItemModel.fromFirestore(doc)).toList();
+
+      items.sort((a, b) => a.position.compareTo(b.position));
+
+      return items;
+    });
+  }
+
+  /// Delete addon item
+  Future<void> deleteAddonItem(String addonItemId) async {
+    await _menuItemsRef.doc(addonItemId).delete();
+  }
+
+  /// Toggle availability (Quick Admin Action)
+  Future<void> toggleAddonAvailability({
+    required String addonItemId,
+    required bool isAvailable,
+  }) async {
+    await _menuItemsRef.doc(addonItemId).update({
+      'isAvailable': isAvailable,
+      'updatedAt': Timestamp.now(),
+    });
+  }
+
+  /// Increment usage analytics (future checkout integration)
+  Future<void> incrementAddonUsage(String addonItemId) async {
+    await _menuItemsRef.doc(addonItemId).update({
+      'usageCount': FieldValue.increment(1),
+    });
+  }
+
+  /* ====================================================
+     UTILITIES
+  ==================================================== */
 
   /// Attach addon groups to a menu item
   Future<void> attachAddonGroupsToMenuItem({

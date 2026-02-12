@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:foodfleet/screens/dashboards/restaurant_admin/manage_menu/addons/addon_groups_screen.dart';
+import 'package:foodfleet/screens/dashboards/restaurant_admin/manage_menu/addon_group/addon_groups_screen.dart';
+import 'package:foodfleet/screens/dashboards/restaurant_admin/manage_menu/addon_items/addon_item_screen.dart';
 import 'package:foodfleet/screens/dashboards/restaurant_admin/manage_menu/categories/categories_screen.dart';
 import 'package:foodfleet/screens/dashboards/restaurant_admin/manage_menu/menu_items/menu_items_screen.dart';
 
-enum MenuTab { categories, items, addons }
+enum MenuTab { categories, items, addonItems, addonGroups }
 
 class MenuDashboard extends StatefulWidget {
+  final String restaurantId;
   final MenuTab initialTab;
 
   const MenuDashboard({
     super.key,
+    required this.restaurantId,
     this.initialTab = MenuTab.categories,
   });
 
@@ -43,40 +46,73 @@ class _MenuDashboardState extends State<MenuDashboard> {
       body: Column(
         children: [
           // ---------------------------
-          // TOP MENU TABS (CARDS)
-          // ---------------------------
+// TOP MENU TABS (CARDS)
+// ---------------------------
           Padding(
             padding: const EdgeInsets.all(16),
-            child: GridView.count(
-              crossAxisCount: isDesktop ? 3 : 1,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: isDesktop ? 3.5 : 3,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _MenuTabCard(
-                  title: 'Categories',
-                  subtitle: 'Organize menu sections',
-                  icon: Icons.folder,
-                  isActive: _selectedTab == MenuTab.categories,
-                  onTap: () => _switchTab(MenuTab.categories),
-                ),
-                _MenuTabCard(
-                  title: 'Menu Items',
-                  subtitle: 'Add & manage dishes',
-                  icon: Icons.restaurant,
-                  isActive: _selectedTab == MenuTab.items,
-                  onTap: () => _switchTab(MenuTab.items),
-                ),
-                _MenuTabCard(
-                  title: 'Add-ons',
-                  subtitle: 'Create addon groups',
-                  icon: Icons.add_circle_outline,
-                  isActive: _selectedTab == MenuTab.addons,
-                  onTap: () => _switchTab(MenuTab.addons),
-                ),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+
+                // Responsive card width
+                double cardWidth;
+                if (width >= 1400) {
+                  cardWidth = (width - 48) / 4; // 4 per row
+                } else if (width >= 900) {
+                  cardWidth = (width - 32) / 3; // 3 per row
+                } else if (width >= 600) {
+                  cardWidth = (width - 16) / 2; // 2 per row
+                } else {
+                  cardWidth = width; // 1 per row (mobile)
+                }
+
+                return Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  children: [
+                    SizedBox(
+                      width: cardWidth,
+                      child: _MenuTabCard(
+                        title: 'Categories',
+                        subtitle: 'Organize menu sections',
+                        icon: Icons.folder,
+                        isActive: _selectedTab == MenuTab.categories,
+                        onTap: () => _switchTab(MenuTab.categories),
+                      ),
+                    ),
+                    SizedBox(
+                      width: cardWidth,
+                      child: _MenuTabCard(
+                        title: 'Menu Items',
+                        subtitle: 'Add & manage dishes',
+                        icon: Icons.restaurant,
+                        isActive: _selectedTab == MenuTab.items,
+                        onTap: () => _switchTab(MenuTab.items),
+                      ),
+                    ),
+                    SizedBox(
+                      width: cardWidth,
+                      child: _MenuTabCard(
+                        title: 'Addon Items',
+                        subtitle: 'Create addon options',
+                        icon: Icons.add_shopping_cart,
+                        isActive: _selectedTab == MenuTab.addonItems,
+                        onTap: () => _switchTab(MenuTab.addonItems),
+                      ),
+                    ),
+                    SizedBox(
+                      width: cardWidth,
+                      child: _MenuTabCard(
+                        title: 'Addon Groups',
+                        subtitle: 'Organize addon items',
+                        icon: Icons.extension,
+                        isActive: _selectedTab == MenuTab.addonGroups,
+                        onTap: () => _switchTab(MenuTab.addonGroups),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
 
@@ -101,8 +137,10 @@ class _MenuDashboardState extends State<MenuDashboard> {
         return const CategoriesScreen();
       case MenuTab.items:
         return const MenuItemsScreen();
-      case MenuTab.addons:
-        return const AddonGroupsScreen();
+      case MenuTab.addonItems:
+        return AddonItemsScreen(restaurantId: widget.restaurantId);
+      case MenuTab.addonGroups:
+        return AddonGroupsScreen(restaurantId: widget.restaurantId);
     }
   }
 }
@@ -153,27 +191,31 @@ class _MenuTabCard extends StatelessWidget {
           children: [
             Icon(icon, size: 28, color: colors.onSecondary),
             const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: colors.secondary,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: colors.secondary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: colors.onSecondary,
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colors.onSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
