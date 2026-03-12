@@ -25,11 +25,18 @@ class AuthService {
         password: password,
       );
 
-      return userCredential.user == null
-          ? null
-          : await _databaseService.getUserData(userCredential.user!.uid);
+      if (userCredential.user == null) return null;
+
+      final userData =
+          await _databaseService.getUserData(userCredential.user!.uid);
+      print("✅ User fetched: ${userData?.role}");
+      return userData;
     } on FirebaseAuthException catch (e) {
+      print("❌ FirebaseAuthException: ${e.code}");
       throw _handleAuthException(e);
+    } catch (e) {
+      print("❌ Unknown error during sign in: $e");
+      rethrow;
     }
   }
 

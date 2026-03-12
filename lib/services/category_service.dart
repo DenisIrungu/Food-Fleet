@@ -10,7 +10,6 @@ class CategoryService {
 
   bool get _hasRestaurant => restaurantId.isNotEmpty;
 
-  // 🔹 Updated: Use restaurant subcollection
   CollectionReference<Map<String, dynamic>> get _categoryRef => _firestore
       .collection('restaurants')
       .doc(restaurantId)
@@ -40,7 +39,19 @@ class CategoryService {
   // ======================================================
   Future<void> updateCategory(CategoryModel category) async {
     if (!_hasRestaurant) throw Exception('Restaurant not set');
-    await _categoryRef.doc(category.id).update(category.toMap());
+
+    // 🔒 Fetch current state from Firestore to verify isDefault
+    final doc = await _categoryRef.doc(category.id).get();
+    if (!doc.exists) throw Exception('Category not found');
+
+    final existing = CategoryModel.fromFirestore(doc);
+
+    // 🔒 Protect name of default categories
+    final updatedCategory = existing.isDefault
+        ? category.copyWith(name: existing.name, isDefault: true)
+        : category;
+
+    await _categoryRef.doc(category.id).update(updatedCategory.toMap());
   }
 
   // ======================================================
@@ -48,6 +59,18 @@ class CategoryService {
   // ======================================================
   Future<void> deleteCategory(String categoryId) async {
     if (!_hasRestaurant) throw Exception('Restaurant not set');
+
+    // 🔒 Fetch to check isDefault before deleting
+    final doc = await _categoryRef.doc(categoryId).get();
+    if (!doc.exists) throw Exception('Category not found');
+
+    final category = CategoryModel.fromFirestore(doc);
+
+    if (category.isDefault) {
+      throw Exception(
+          '\'${category.name}\' is a default category and cannot be deleted.');
+    }
+
     await _categoryRef.doc(categoryId).delete();
   }
 

@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:foodfleet/Theme/theme_provider.dart';
-import 'package:foodfleet/screens/dashboards/restaurant_admin/manage_menu/addon_group/addon_groups_screen.dart';
-import 'package:foodfleet/screens/dashboards/restaurant_admin/manage_menu/categories/categories_screen.dart';
-import 'package:foodfleet/screens/dashboards/restaurant_admin/manage_menu/menu_dashboard.dart';
-import 'package:foodfleet/screens/dashboards/restaurant_admin/manage_menu/menu_items/menu_items_screen.dart';
-import 'package:foodfleet/screens/dashboards/restaurant_admin/restaurant_dashboard.dart';
-import 'package:foodfleet/screens/dashboards/super_admin/change_password.dart';
-import 'package:foodfleet/screens/dashboards/super_admin/create_admin.dart';
+import 'package:foodfleet/screens/customers/screens/customer_entry_screen.dart';
+import 'package:foodfleet/screens/restaurant_admin/manage_menu/addon_group/addon_groups_screen.dart';
+import 'package:foodfleet/screens/restaurant_admin/manage_menu/categories/categories_screen.dart';
+import 'package:foodfleet/screens/restaurant_admin/manage_menu/menu_dashboard.dart';
+import 'package:foodfleet/screens/restaurant_admin/manage_menu/menu_items/menu_items_screen.dart';
+import 'package:foodfleet/screens/restaurant_admin/restaurant_dashboard.dart';
+import 'package:foodfleet/screens/super_admin/change_password.dart';
+import 'package:foodfleet/screens/super_admin/create_admin.dart';
 import 'package:foodfleet/screens/splashscreens/splashscreen1.dart';
 import 'package:foodfleet/services/database_service.dart';
 import 'package:provider/provider.dart';
@@ -17,7 +18,7 @@ import 'models/user_model.dart';
 import 'package:foodfleet/providers/restaurant_scope_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
-import 'screens/dashboards/super_admin/super_admin_dashboard.dart';
+import 'screens/super_admin/super_admin_dashboard.dart';
 
 class AppView extends StatelessWidget {
   const AppView({super.key});
@@ -50,6 +51,7 @@ class AppView extends StatelessWidget {
         SUPER_ADMIN_DASHBOARD_ROUTE: (context) => const SuperAdminDashboard(),
         CREATE_ADMIN: (context) => const CreateAdmin(),
         RESTAURANT_DASHBOARD_ROUTE: (context) => const RestaurantDashboard(),
+        CUSTOMER_DASHBOARD_ROUTE: (context) => const CustomerEntryScreen(),
 
         // ===============================
         // ✅ MENU MANAGEMENT (NEW)
@@ -127,8 +129,13 @@ class AuthWrapper extends StatelessWidget {
     switch (role) {
       case ROLE_SUPER_ADMIN:
         return const SuperAdminDashboard();
+
       case ROLE_RESTAURANT_ADMIN:
         return const RestaurantDashboard();
+
+      case ROLE_CUSTOMER:
+        return const CustomerEntryScreen();
+
       default:
         return const SplashScreen();
     }

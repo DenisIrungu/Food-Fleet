@@ -48,6 +48,7 @@ class DatabaseService {
       rethrow;
     }
   }
+
   // MOBILE
   Future<String?> updateProfilePicture(String uid, File imageFile) async {
     try {
@@ -60,7 +61,6 @@ class DatabaseService {
         'profilePictureUpdatedAt': FieldValue.serverTimestamp(),
       });
 
-      // ❌ DO NOT CLEANUP HERE
       print("✅ Profile picture uploaded and updated.");
       return url;
     } catch (e) {
@@ -69,7 +69,7 @@ class DatabaseService {
     }
   }
 
-// WEB
+  // WEB
   Future<String?> updateProfilePictureWeb(
     String uid,
     Uint8List imageBytes,
@@ -271,7 +271,7 @@ class DatabaseService {
     }
   }
 
-// ✅ Super Admin creates restaurant & admin user
+  // ✅ Super Admin creates restaurant & admin user
   Future<void> createRestaurantWithAdmin({
     required RestaurantModel restaurant,
     required UserModel adminUser,
@@ -295,9 +295,120 @@ class DatabaseService {
       await addUser(updatedAdmin);
       await updateRestaurantData(restaurantId, {'adminUid': adminUser.uid});
 
+      // ✅ Auto-create default categories for the new restaurant
+      await _createDefaultCategories(restaurantId);
+
       print("✅ Restaurant & admin successfully created and linked.");
     } catch (e) {
       print("❌ Error creating restaurant with admin: $e");
+      rethrow;
+    }
+  }
+
+  // ============================================
+  // DEFAULT CATEGORIES
+  // ============================================
+
+  /// ✅ Creates "Chef's Special" and "Top of the Week" for a restaurant
+  /// Skips creation if a category with the same name already exists
+  Future<void> _createDefaultCategories(String restaurantId) async {
+    try {
+      final categoriesRef = _firestore
+          .collection(COLLECTION_RESTAURANTS)
+          .doc(restaurantId)
+          .collection('categories');
+
+      final defaultCategories = [
+        {
+          'name': "Chef's Special",
+          'description': 'Featured dish recommended by the chef',
+          'position': 0,
+          'isActive': true,
+          'isDefault': true,
+          'restaurantId': restaurantId,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        {
+          'name': 'Top of the Week',
+          'description': 'Most popular dishes this week',
+          'position': 1,
+          'isActive': true,
+          'isDefault': true,
+          'restaurantId': restaurantId,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+      ];
+
+      for (final category in defaultCategories) {
+        // Check if category already exists to avoid duplicates
+        final existing = await categoriesRef
+            .where('name', isEqualTo: category['name'])
+            .limit(1)
+            .get();
+
+        if (existing.docs.isEmpty) {
+          await categoriesRef.add(category);
+          print("✅ Default category '${category['name']}' created.");
+        } else {
+          print("⚠️ Category '${category['name']}' already exists, skipping.");
+        }
+      }
+    } catch (e) {
+      print("❌ Error creating default categories: $e");
+      rethrow;
+    }
+  }
+
+  /// ✅ One-time migration — adds default categories to all existing restaurants
+  /// Safe to run multiple times — skips restaurants that already have them
+  Future<void> migrateDefaultCategories() async {
+    try {
+      print("🔄 Starting default categories migration...");
+
+      final restaurants =
+          await _firestore.collection(COLLECTION_RESTAURANTS).get();
+
+      int migrated = 0;
+      int skipped = 0;
+
+      for (final doc in restaurants.docs) {
+        final restaurantId = doc.id;
+
+        final categoriesRef = _firestore
+            .collection(COLLECTION_RESTAURANTS)
+            .doc(restaurantId)
+            .collection('categories');
+
+        // Check if Chef's Special exists
+        final chefsSpecial = await categoriesRef
+            .where('name', isEqualTo: "Chef's Special")
+            .limit(1)
+            .get();
+
+        // Check if Top of the Week exists
+        final topOfWeek = await categoriesRef
+            .where('name', isEqualTo: 'Top of the Week')
+            .limit(1)
+            .get();
+
+        final needsMigration =
+            chefsSpecial.docs.isEmpty || topOfWeek.docs.isEmpty;
+
+        if (needsMigration) {
+          await _createDefaultCategories(restaurantId);
+          migrated++;
+          print("✅ Migrated restaurant: $restaurantId");
+        } else {
+          skipped++;
+          print("⚠️ Skipped restaurant: $restaurantId (already has defaults)");
+        }
+      }
+
+      print("✅ Migration complete. Migrated: $migrated, Skipped: $skipped");
+    } catch (e) {
+      print("❌ Migration failed: $e");
       rethrow;
     }
   }
@@ -408,7 +519,6 @@ class DatabaseService {
     });
   }
 
-  // Add this method to your DatabaseService class
   Stream<RestaurantModel?> streamRestaurantById(String restaurantId) {
     return _firestore
         .collection(COLLECTION_RESTAURANTS)
