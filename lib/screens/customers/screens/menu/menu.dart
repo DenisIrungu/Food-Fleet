@@ -9,8 +9,9 @@ import 'package:provider/provider.dart';
 
 class MenuPage extends StatefulWidget {
   final RestaurantModel restaurant;
+  final VoidCallback? onCartTap;
 
-  const MenuPage({super.key, required this.restaurant});
+  const MenuPage({super.key, required this.restaurant, this.onCartTap});
 
   @override
   State<MenuPage> createState() => _MenuPageState();
@@ -87,7 +88,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               IconButton(
                 icon: const Icon(Icons.shopping_cart_outlined,
                     color: Colors.white, size: 26),
-                onPressed: () {},
+                onPressed: widget.onCartTap,
               ),
               if (cartCount > 0)
                 Positioned(

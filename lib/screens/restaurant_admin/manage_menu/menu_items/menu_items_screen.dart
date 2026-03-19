@@ -15,7 +15,7 @@ class MenuItemsScreen extends StatefulWidget {
 
 class _MenuItemsScreenState extends State<MenuItemsScreen> {
   CategoryModel? _selectedCategory;
-  bool _isAdmin = true;
+  final bool _isAdmin = true;
   MenuService? _menuService;
   bool _initialized = false;
 
@@ -150,9 +150,6 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
                                     backgroundImage: item.imageUrl.isNotEmpty
                                         ? NetworkImage(item.imageUrl)
                                         : null,
-                                    child: item.imageUrl.isEmpty
-                                        ? const Icon(Icons.restaurant_menu)
-                                        : null,
                                     onBackgroundImageError:
                                         item.imageUrl.isNotEmpty
                                             ? (exception, stackTrace) {
@@ -160,6 +157,9 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
                                                     'Image failed to load for ${item.name}: $exception');
                                               }
                                             : null,
+                                    child: item.imageUrl.isEmpty
+                                        ? const Icon(Icons.restaurant_menu)
+                                        : null,
                                   ),
                                   title: Text(item.name,
                                       style: TextStyle(

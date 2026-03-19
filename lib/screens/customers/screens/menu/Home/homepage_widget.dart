@@ -8,8 +8,7 @@ import 'package:provider/provider.dart';
 class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
   final RestaurantModel restaurant;
 
-  const HomeAppBar(
-      {super.key, required this.context, required this.restaurant});
+  const HomeAppBar({super.key, required this.context, required this.restaurant});
 
   final BuildContext context;
 

@@ -58,7 +58,7 @@ class AppView extends StatelessWidget {
         // ===============================
         MENU_DASHBOARD_ROUTE: (context) {
           final restaurantId = context.read<RestaurantScope>().restaurantId;
-          if (restaurantId == null || restaurantId.isEmpty) {
+          if (restaurantId.isEmpty) {
             // Fallback - should not happen if RestaurantScope is set properly
             return const Scaffold(
               body: Center(child: Text('Restaurant not set')),

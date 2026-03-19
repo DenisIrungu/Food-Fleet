@@ -4,11 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import '../models/restaurant_model.dart';
-import '../models/user_model.dart';
 import '../services/database_service.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
-import '../utils/constants.dart';
 
 class RestaurantController extends ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:foodfleet/models/cart_models.dart';
 import 'package:foodfleet/providers/cart_providers.dart';
+import 'package:foodfleet/screens/customers/screens/payments/select_payment_method.dart';
 import 'package:provider/provider.dart';
 
 class CartScreen extends StatelessWidget {
@@ -79,6 +80,7 @@ class CartScreen extends StatelessWidget {
                     _OrderSummary(
                       cart: cart,
                       restaurantId: restaurantId,
+                      restaurantName: restaurantName,
                     ),
                   ],
                 ),
@@ -282,10 +284,12 @@ class _QuantityButton extends StatelessWidget {
 class _OrderSummary extends StatelessWidget {
   final CartProvider cart;
   final String restaurantId;
+  final String restaurantName;
 
   const _OrderSummary({
     required this.cart,
     required this.restaurantId,
+    required this.restaurantName,
   });
 
   @override
@@ -335,7 +339,16 @@ class _OrderSummary extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  // TODO: Navigate to checkout
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SelectPaymentScreen(
+                        restaurantId: restaurantId,
+                        restaurantName: restaurantName,
+                        totalAmount: total,
+                      ),
+                    ),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0F2A12),

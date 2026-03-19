@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:foodfleet/screens/customers/screens/payments/mpesa/mpesa_setting_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:foodfleet/controllers/restaurant_controller.dart';
 import 'package:foodfleet/models/restaurant_model.dart';
-import 'package:foodfleet/models/user_model.dart'; // New import for UserModel
-import 'package:foodfleet/services/database_service.dart'; // New import for fetching user data
+import 'package:foodfleet/models/user_model.dart';
+import 'package:foodfleet/services/database_service.dart';
 import 'package:foodfleet/utils/routes.dart';
 
 class ManageRestaurants extends StatelessWidget {
@@ -110,11 +111,11 @@ class _ManageRestaurantsViewState extends State<ManageRestaurantsView> {
                   int crossAxisCount = 1;
 
                   if (constraints.maxWidth >= 1200) {
-                    crossAxisCount = 4; // Desktop
+                    crossAxisCount = 4;
                   } else if (constraints.maxWidth >= 900) {
-                    crossAxisCount = 3; // Tablet landscape
+                    crossAxisCount = 3;
                   } else if (constraints.maxWidth >= 600) {
-                    crossAxisCount = 2; // Tablet portrait
+                    crossAxisCount = 2;
                   }
 
                   return StreamBuilder<List<RestaurantModel>>(
@@ -160,7 +161,7 @@ class _ManageRestaurantsViewState extends State<ManageRestaurantsView> {
                           crossAxisCount: crossAxisCount,
                           crossAxisSpacing: 15,
                           mainAxisSpacing: 15,
-                          childAspectRatio: 1.3,
+                          childAspectRatio: 1.2,
                         ),
                         itemBuilder: (context, index) {
                           return _buildRestaurantCard(
@@ -181,15 +182,13 @@ class _ManageRestaurantsViewState extends State<ManageRestaurantsView> {
     );
   }
 
-  /// 🧱 Scroll-safe card
   Widget _buildRestaurantCard(
     BuildContext context,
     RestaurantModel restaurant,
     ColorScheme colorScheme,
   ) {
     return FutureBuilder<UserModel?>(
-      future: DatabaseService().getUserData(
-          restaurant.adminUid), // Fetch admin user for profile picture
+      future: DatabaseService().getUserData(restaurant.adminUid),
       builder: (context, snapshot) {
         String? profilePictureUrl;
         String initial =
@@ -215,34 +214,53 @@ class _ManageRestaurantsViewState extends State<ManageRestaurantsView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.white),
-                          onPressed: () {
-                            Navigator.pushNamed(
-                              context,
-                              CREATE_ADMIN,
-                              arguments: restaurant, // 👈 pass restaurant
-                            );
-                          },
-                        ),
-                        IconButton(
-                          icon:
-                              const Icon(Icons.delete, color: Colors.redAccent),
-                          onPressed: () {
-                            context
-                                .read<RestaurantController>()
-                                .deleteRestaurant(restaurant);
-                          },
-                        ),
-                      ],
-                    ),
+                  // ── ACTION BUTTONS ──
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      // M-Pesa Settings
+                      IconButton(
+                        tooltip: 'M-Pesa Settings',
+                        icon: const Icon(Icons.payment, color: Colors.green),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => MpesaSettingsScreen(
+                                restaurant: restaurant,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      // Edit
+                      IconButton(
+                        tooltip: 'Edit Restaurant',
+                        icon: const Icon(Icons.edit, color: Colors.white),
+                        onPressed: () {
+                          Navigator.pushNamed(
+                            context,
+                            CREATE_ADMIN,
+                            arguments: restaurant,
+                          );
+                        },
+                      ),
+                      // Delete
+                      IconButton(
+                        tooltip: 'Delete Restaurant',
+                        icon: const Icon(Icons.delete, color: Colors.redAccent),
+                        onPressed: () {
+                          context
+                              .read<RestaurantController>()
+                              .deleteRestaurant(restaurant);
+                        },
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
+
+                  const SizedBox(height: 6),
+
+                  // ── AVATAR ──
                   Center(
                     child: CircleAvatar(
                       radius: 35,
@@ -257,7 +275,10 @@ class _ManageRestaurantsViewState extends State<ManageRestaurantsView> {
                           : null,
                     ),
                   ),
+
                   const SizedBox(height: 12),
+
+                  // ── NAME ──
                   Center(
                     child: Text(
                       restaurant.name,
@@ -269,6 +290,7 @@ class _ManageRestaurantsViewState extends State<ManageRestaurantsView> {
                       ),
                     ),
                   ),
+
                   const SizedBox(height: 8),
                   Text("📍 ${restaurant.address}"),
                   Text("☎ ${restaurant.phone}"),

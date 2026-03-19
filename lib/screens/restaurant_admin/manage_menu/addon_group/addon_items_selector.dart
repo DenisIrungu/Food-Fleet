@@ -138,7 +138,7 @@ class _ItemsList extends StatelessWidget {
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(6),
                     child: Image.network(
-                      item.imageUrl!,
+                      item.imageUrl,
                       width: 40,
                       height: 40,
                       fit: BoxFit.cover,

@@ -22,12 +22,19 @@ class _MainScreenState extends State<MainScreen> {
     setState(() => _selectedIndex = index);
   }
 
+  void _goToCart() {
+    setState(() => _selectedIndex = 2);
+  }
+
   Widget _buildPage(int index) {
     switch (index) {
       case 0:
         return HomePage(restaurant: widget.restaurant);
       case 1:
-        return MenuPage(restaurant: widget.restaurant);
+        return MenuPage(
+          restaurant: widget.restaurant,
+          onCartTap: _goToCart,
+        );
       case 2:
         return CartScreen(
           restaurantId: widget.restaurant.id,

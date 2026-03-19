@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:foodfleet/models/menu_item_model.dart';
 
 class CartItem {
