@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:foodfleet/screens/customers/screens/payments/mpesa/mpesa_payment_page.dart';
+import 'package:foodfleet/models/order_model.dart';
+import 'package:foodfleet/screens/customers/screens/payments/mpesa/mpesa_page.dart';
 
 class SelectPaymentScreen extends StatelessWidget {
   final String restaurantId;
   final String restaurantName;
   final double totalAmount;
+  final OrderModel order;
+  final String? discountCode;
 
   const SelectPaymentScreen({
     super.key,
     required this.restaurantId,
     required this.restaurantName,
     required this.totalAmount,
+    required this.order,
+    this.discountCode,
   });
 
   @override
@@ -32,120 +37,123 @@ class SelectPaymentScreen extends StatelessWidget {
         ),
       ),
       body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text(
-                'Choose your payment method',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Text(
+                  'Choose your payment method',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Select how you would like to pay for your order',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-              ),
-
-              const SizedBox(height: 20),
-
-              // ── ORDER TOTAL ──
-              Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F2A12).withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 6),
+                Text(
+                  'Select how you would like to pay for your order',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Order Total',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0F2A12),
+
+                const SizedBox(height: 20),
+
+                // ── ORDER TOTAL ──
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F2A12).withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Order Total',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F2A12),
+                        ),
                       ),
-                    ),
-                    Text(
-                      'Ksh ${totalAmount.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F2A12),
+                      Text(
+                        'Ksh ${totalAmount.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F2A12),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 32),
+                const SizedBox(height: 32),
 
-              // ── M-PESA ──
-              _PaymentOptionCard(
-                icon: Icons.phone_android,
-                iconBgColor: const Color(0xFF4CAF50),
-                title: 'M-Pesa',
-                subtitle: 'Pay with mobile money',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => MpesaPaymentPage(
-                        restaurantId: restaurantId,
-                        restaurantName: restaurantName,
-                        amount: totalAmount,
-                        orderId:
-                            DateTime.now().millisecondsSinceEpoch.toString(),
+                // ── M-PESA ──
+                _PaymentOptionCard(
+                  icon: Icons.phone_android,
+                  iconBgColor: const Color(0xFF4CAF50),
+                  title: 'M-Pesa',
+                  subtitle: 'Pay with mobile money',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MpesaPaymentPage(
+                          restaurantId: restaurantId,
+                          restaurantName: restaurantName,
+                          amount: totalAmount,
+                          order: order,
+                          discountCode: discountCode,
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // ── CREDIT CARD ──
-              _PaymentOptionCard(
-                icon: Icons.credit_card,
-                iconBgColor: const Color(0xFF1565C0),
-                title: 'Credit Card',
-                subtitle: 'Pay with credit/debit card',
-                onTap: () => _showComingSoon(context, 'Credit Card'),
-              ),
+                // ── CREDIT CARD ──
+                _PaymentOptionCard(
+                  icon: Icons.credit_card,
+                  iconBgColor: const Color(0xFF1565C0),
+                  title: 'Credit Card',
+                  subtitle: 'Pay with credit/debit card',
+                  onTap: () => _showComingSoon(context, 'Credit Card'),
+                ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // ── REDEEM POINTS ──
-              _PaymentOptionCard(
-                icon: Icons.redeem,
-                iconBgColor: const Color(0xFFF57C00),
-                title: 'Redeem Points',
-                subtitle: 'Use your loyalty points',
-                onTap: () => _showComingSoon(context, 'Redeem Points'),
-              ),
+                // ── REDEEM POINTS ──
+                _PaymentOptionCard(
+                  icon: Icons.redeem,
+                  iconBgColor: const Color(0xFFF57C00),
+                  title: 'Redeem Points',
+                  subtitle: 'Use your loyalty points',
+                  onTap: () => _showComingSoon(context, 'Redeem Points'),
+                ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // ── CRYPTO ──
-              _PaymentOptionCard(
-                icon: Icons.currency_bitcoin,
-                iconBgColor: const Color(0xFFF7931A),
-                title: 'Crypto',
-                subtitle: 'Pay with cryptocurrency',
-                comingSoon: true,
-                onTap: () => _showComingSoon(context, 'Crypto'),
-              ),
-            ],
+                // ── CRYPTO ──
+                _PaymentOptionCard(
+                  icon: Icons.currency_bitcoin,
+                  iconBgColor: const Color(0xFFF7931A),
+                  title: 'Crypto',
+                  subtitle: 'Pay with cryptocurrency',
+                  comingSoon: true,
+                  onTap: () => _showComingSoon(context, 'Crypto'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

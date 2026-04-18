@@ -6,11 +6,15 @@ class RestaurantModel {
   final String adminUid;
   final String email;
   final String phone;
+  final String? whatsappNumber;
   final String address;
+  final String town;
+  final double? latitude;
+  final double? longitude;
   final List<String> cuisineTypes;
   final String? description;
   final String? imageUrl;
-  final String status; // 'active' or 'inactive'
+  final String status;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -20,7 +24,11 @@ class RestaurantModel {
     required this.adminUid,
     required this.email,
     required this.phone,
+    this.whatsappNumber,
     required this.address,
+    required this.town,
+    this.latitude,
+    this.longitude,
     required this.cuisineTypes,
     this.description,
     this.imageUrl,
@@ -29,7 +37,6 @@ class RestaurantModel {
     required this.updatedAt,
   });
 
-  /// Create RestaurantModel from Firestore document
   factory RestaurantModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
     return RestaurantModel(
@@ -38,7 +45,11 @@ class RestaurantModel {
       adminUid: data['adminUid'] ?? '',
       email: data['email'] ?? '',
       phone: data['phone'] ?? '',
+      whatsappNumber: data['whatsappNumber'],
       address: data['address'] ?? '',
+      town: data['town'] ?? '',
+      latitude: (data['latitude'] as num?)?.toDouble(),
+      longitude: (data['longitude'] as num?)?.toDouble(),
       cuisineTypes: List<String>.from(data['cuisineTypes'] ?? []),
       description: data['description'],
       imageUrl: data['imageUrl'],
@@ -52,14 +63,17 @@ class RestaurantModel {
     );
   }
 
-  /// Convert RestaurantModel to Firestore map
   Map<String, dynamic> toMap() {
     return {
       'name': name,
       'adminUid': adminUid,
       'email': email,
       'phone': phone,
+      'whatsappNumber': whatsappNumber,
       'address': address,
+      'town': town,
+      'latitude': latitude,
+      'longitude': longitude,
       'cuisineTypes': cuisineTypes,
       'description': description,
       'imageUrl': imageUrl,
@@ -69,11 +83,14 @@ class RestaurantModel {
     };
   }
 
-  /// Copy with updated fields
   RestaurantModel copyWith({
     String? name,
     String? phone,
+    String? whatsappNumber,
     String? address,
+    String? town,
+    double? latitude,
+    double? longitude,
     List<String>? cuisineTypes,
     String? description,
     String? imageUrl,
@@ -85,7 +102,11 @@ class RestaurantModel {
       adminUid: adminUid,
       email: email,
       phone: phone ?? this.phone,
+      whatsappNumber: whatsappNumber ?? this.whatsappNumber,
       address: address ?? this.address,
+      town: town ?? this.town,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
       cuisineTypes: cuisineTypes ?? this.cuisineTypes,
       description: description ?? this.description,
       imageUrl: imageUrl ?? this.imageUrl,

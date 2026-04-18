@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:foodfleet/models/cart_models.dart';
 import 'package:foodfleet/providers/cart_providers.dart';
-import 'package:foodfleet/screens/customers/screens/payments/select_payment_method.dart';
+import 'package:foodfleet/screens/customers/screens/payments/checkout/checkout_screen.dart';
 import 'package:provider/provider.dart';
 
 class CartScreen extends StatelessWidget {
@@ -64,7 +64,6 @@ class CartScreen extends StatelessWidget {
               ? _EmptyCart()
               : Column(
                   children: [
-                    // ── CART ITEMS ──
                     Expanded(
                       child: ListView.builder(
                         padding: const EdgeInsets.all(16),
@@ -75,8 +74,6 @@ class CartScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-
-                    // ── ORDER SUMMARY ──
                     _OrderSummary(
                       cart: cart,
                       restaurantId: restaurantId,
@@ -114,18 +111,11 @@ class CartScreen extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-// CART ITEM TILE
-// ─────────────────────────────────────────────
-
 class _CartItemTile extends StatelessWidget {
   final CartItem item;
   final String restaurantId;
 
-  const _CartItemTile({
-    required this.item,
-    required this.restaurantId,
-  });
+  const _CartItemTile({required this.item, required this.restaurantId});
 
   @override
   Widget build(BuildContext context) {
@@ -148,7 +138,6 @@ class _CartItemTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── IMAGE ──
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: item.food.imageUrl.isNotEmpty
@@ -161,10 +150,7 @@ class _CartItemTile extends StatelessWidget {
                   )
                 : _imagePlaceholder(),
           ),
-
           const SizedBox(width: 12),
-
-          // ── DETAILS ──
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,25 +163,17 @@ class _CartItemTile extends StatelessWidget {
                     color: Color(0xFF0F2A12),
                   ),
                 ),
-
-                // Addons
                 if (item.selectedAddonItems.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
                     item.selectedAddonItems.map((a) => a.name).join(', '),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],
-
                 const SizedBox(height: 8),
-
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Price
                     Text(
                       'Ksh ${item.totalPrice.toStringAsFixed(2)}',
                       style: const TextStyle(
@@ -204,8 +182,6 @@ class _CartItemTile extends StatelessWidget {
                         color: Color(0xFF0F2A12),
                       ),
                     ),
-
-                    // ── QUANTITY CONTROLS ──
                     Row(
                       children: [
                         _QuantityButton(
@@ -251,10 +227,6 @@ class _CartItemTile extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────
-// QUANTITY BUTTON
-// ─────────────────────────────────────────────
-
 class _QuantityButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
@@ -276,10 +248,6 @@ class _QuantityButton extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────
-// ORDER SUMMARY
-// ─────────────────────────────────────────────
 
 class _OrderSummary extends StatelessWidget {
   final CartProvider cart;
@@ -342,10 +310,9 @@ class _OrderSummary extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => SelectPaymentScreen(
+                      builder: (_) => CheckoutScreen(
                         restaurantId: restaurantId,
                         restaurantName: restaurantName,
-                        totalAmount: total,
                       ),
                     ),
                   );
@@ -374,10 +341,6 @@ class _OrderSummary extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-// EMPTY CART
-// ─────────────────────────────────────────────
-
 class _EmptyCart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -399,10 +362,7 @@ class _EmptyCart extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Add items from the menu to get started',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade400,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade400),
           ),
         ],
       ),

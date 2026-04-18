@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:flutter/foundation.dart';
 import 'firebase_options.dart';
 import 'app.dart';
 import 'services/super_admin_init.dart';
@@ -23,12 +24,14 @@ void main() async {
     }
   }
 
-  // ✅ Initialize App Check with debug provider for development
-  await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.debug,
-    appleProvider: AppleProvider.debug,
-  );
-  print('✅ App Check initialized!');
+  // ✅ Initialize App Check — debug for mobile, skip for web
+  if (!kIsWeb) {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: AndroidProvider.debug,
+      appleProvider: AppleProvider.debug,
+    );
+    print('✅ App Check initialized!');
+  }
 
   print('👤 Initializing Super Admin...');
   final superAdminInit = SuperAdminInitService();

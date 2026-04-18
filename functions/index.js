@@ -102,44 +102,56 @@ exports.initiateStkPush = onRequest(
             });
         }
 
-        // ── GENERATE PASSWORD & TIMESTAMP ──
-        const { password, timestamp } = getMpesaPassword(shortcode, passkey);
-        console.log(`Timestamp: ${timestamp}`);
-
         // ── CALLBACK URL ──
         const callbackUrl = `https://mpesacallback-i66m6taedq-uc.a.run.app`;
 
-        // ── STK PUSH REQUEST ──
+        // ── STK PUSH REQUEST WITH RETRY ──
         let stkResponse;
-        try {
-            console.log(`Sending STK push to Safaricom...`);
-            stkResponse = await axios.post(
-                "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
-                {
-                    BusinessShortCode: shortcode,
-                    Password: password,
-                    Timestamp: timestamp,
-                    TransactionType: "CustomerPayBillOnline",
-                    Amount: Math.ceil(amount),
-                    PartyA: formattedPhone,
-                    PartyB: shortcode,
-                    PhoneNumber: formattedPhone,
-                    CallBackURL: callbackUrl,
-                    AccountReference: `FoodFleet-${orderId}`,
-                    TransactionDesc: "Food Order Payment",
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        while (attempts < maxAttempts) {
+            try {
+                attempts++;
+                console.log(`STK push attempt ${attempts}...`);
+
+                // Get fresh token on each attempt
+                accessToken = await getMpesaAccessToken(consumerKey, consumerSecret);
+                const { password: freshPassword, timestamp: freshTimestamp } = getMpesaPassword(shortcode, passkey);
+
+                stkResponse = await axios.post(
+                    "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
+                    {
+                        BusinessShortCode: shortcode,
+                        Password: freshPassword,
+                        Timestamp: freshTimestamp,
+                        TransactionType: "CustomerPayBillOnline",
+                        Amount: Math.ceil(amount),
+                        PartyA: formattedPhone,
+                        PartyB: shortcode,
+                        PhoneNumber: formattedPhone,
+                        CallBackURL: callbackUrl,
+                        AccountReference: `FoodFleet-${orderId}`,
+                        TransactionDesc: "Food Order Payment",
                     },
+                    {
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                        },
+                    }
+                );
+                console.log(`STK response: ${JSON.stringify(stkResponse.data)}`);
+                break; // success — exit loop
+            } catch (e) {
+                console.error(`Attempt ${attempts} failed: ${JSON.stringify(e.response?.data)} - ${e.message}`);
+                if (attempts >= maxAttempts) {
+                    return res.status(500).json({
+                        error: `STK Push failed after ${maxAttempts} attempts: ${e.response?.data?.errorMessage || e.message}`
+                    });
                 }
-            );
-            console.log(`STK response: ${JSON.stringify(stkResponse.data)}`);
-        } catch (e) {
-            console.error(`STK Push error: ${JSON.stringify(e.response?.data)} - ${e.message}`);
-            return res.status(500).json({
-                error: `STK Push failed: ${e.response?.data?.errorMessage || e.message}`
-            });
+                // Wait 1 second before retrying
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
         }
 
         const { CheckoutRequestID, ResponseCode, ResponseDescription } = stkResponse.data;
@@ -221,6 +233,7 @@ exports.mpesaCallback = onRequest(
 
 // ─────────────────────────────────────────────
 // CLOUD FUNCTION: Query STK Push Status
+// Checks Firestore first, then queries Safaricom directly
 // ─────────────────────────────────────────────
 exports.queryStkStatus = onRequest(
     { region: "us-central1", cors: true },
@@ -229,18 +242,100 @@ exports.queryStkStatus = onRequest(
             return res.status(405).json({ error: "Method not allowed" });
         }
 
-        const { checkoutRequestId } = req.body;
+        const { checkoutRequestId, restaurantId } = req.body;
 
         if (!checkoutRequestId) {
             return res.status(400).json({ error: "checkoutRequestId is required" });
         }
 
+        // ── CHECK FIRESTORE FIRST ──
         const paymentDoc = await db.collection("payments").doc(checkoutRequestId).get();
 
-        if (!paymentDoc.exists) {
+        if (paymentDoc.exists) {
+            const status = paymentDoc.data().status;
+            // If already resolved, return immediately
+            if (status === "success" || status === "failed") {
+                return res.status(200).json({ status });
+            }
+        }
+
+        // ── QUERY SAFARICOM DIRECTLY ──
+        if (!restaurantId) {
             return res.status(200).json({ status: "pending" });
         }
 
-        return res.status(200).json({ status: paymentDoc.data().status });
+        try {
+            const settingsDoc = await db
+                .collection("restaurants")
+                .doc(restaurantId)
+                .collection("paymentSettings")
+                .doc("mpesa")
+                .get();
+
+            if (!settingsDoc.exists) {
+                return res.status(200).json({ status: "pending" });
+            }
+
+            const { shortcode, passkey, consumerKey, consumerSecret } = settingsDoc.data();
+            const accessToken = await getMpesaAccessToken(consumerKey, consumerSecret);
+            const { password, timestamp } = getMpesaPassword(shortcode, passkey);
+
+            const queryResponse = await axios.post(
+                "https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query",
+                {
+                    BusinessShortCode: shortcode,
+                    Password: password,
+                    Timestamp: timestamp,
+                    CheckoutRequestID: checkoutRequestId,
+                },
+                {
+                    headers: { Authorization: `Bearer ${accessToken}` },
+                }
+            );
+
+            const { ResultCode, ResultDesc } = queryResponse.data;
+            console.log(`Safaricom query result: ${ResultCode} - ${ResultDesc}`);
+
+            if (ResultCode === "0" || ResultCode === 0) {
+                // Payment successful — update Firestore
+                await db.collection("payments").doc(checkoutRequestId).set({
+                    checkoutRequestId,
+                    status: "success",
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                }, { merge: true });
+
+                // Update order status
+                if (paymentDoc.exists) {
+                    const { orderId } = paymentDoc.data();
+                    if (orderId) {
+                        await db.collection("orders").doc(orderId).update({
+                            status: "confirmed",
+                            paymentStatus: "paid",
+                            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                        });
+                    }
+                }
+
+                return res.status(200).json({ status: "success" });
+            } else if (ResultCode === "1032" || ResultCode === 1032) {
+                // Explicitly cancelled by user
+                await db.collection("payments").doc(checkoutRequestId).set({
+                    checkoutRequestId,
+                    status: "failed",
+                    resultDesc: ResultDesc,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                }, { merge: true });
+
+                return res.status(200).json({ status: "failed" });
+            } else {
+                // Any other code (1037 timeout, errors etc) — keep polling
+                console.log(`Non-conclusive result code ${ResultCode} — keeping pending`);
+                return res.status(200).json({ status: "pending" });
+            }
+        } catch (e) {
+            console.error(`Query error: ${e.message}`);
+            // If query fails, return pending — keep polling
+            return res.status(200).json({ status: "pending" });
+        }
     }
 );

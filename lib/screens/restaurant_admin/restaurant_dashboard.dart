@@ -8,6 +8,7 @@ import 'package:foodfleet/services/auth_service.dart';
 import 'package:foodfleet/services/database_service.dart';
 import 'package:foodfleet/utils/routes.dart';
 
+import 'restaurant_settings_screen.dart';
 import 'restaurant_widgets/active_badge.dart';
 import 'restaurant_widgets/restaurant_drawer.dart';
 import 'restaurant_widgets/status_banner.dart';
@@ -38,7 +39,7 @@ class _RestaurantDashboardState extends State<RestaurantDashboard> {
   ];
 
   /// ✅ UPDATED: Handles all screens properly
-  Widget _getSelectedScreen(double width, String restaurantId) {
+  Widget _getSelectedScreen(double width, String restaurantId, RestaurantModel restaurant) {
     switch (_selectedIndex) {
       case 0:
         return _buildDashboardOverview(width);
@@ -63,7 +64,7 @@ class _RestaurantDashboardState extends State<RestaurantDashboard> {
         return const Center(child: Text("Earnings — Coming Soon"));
 
       case 6:
-        return const Center(child: Text("Profile — Coming Soon"));
+        return RestaurantSettingsScreen(restaurant: restaurant);
 
       default:
         return _buildDashboardOverview(width);
@@ -206,7 +207,7 @@ class _RestaurantDashboardState extends State<RestaurantDashboard> {
               ),
               body: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
-                child: _getSelectedScreen(width, restaurant.id),
+                child: _getSelectedScreen(width, restaurant.id, restaurant),
               ),
             );
           },

@@ -30,6 +30,11 @@ dependencies:
   uuid: ^4.3.3
   cloud_functions: ^6.0.2
   firebase_app_check: 0.4.1
+  geolocator: 13.0.1
+  geocoding: 3.0.0
+  google_maps_flutter: ^2.12.3
+  flutter_google_places_sdk: ^0.4.2+1
+  url_launcher: ^6.3.0
 
 
 dev_dependencies:

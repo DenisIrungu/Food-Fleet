@@ -4,10 +4,12 @@ import 'package:foodfleet/screens/customers/screens/main_screens_controller.dart
 
 class RestaurantCard extends StatelessWidget {
   final RestaurantModel restaurant;
+  final String? distanceLabel;
 
   const RestaurantCard({
     super.key,
     required this.restaurant,
+    this.distanceLabel,
   });
 
   @override
@@ -37,7 +39,7 @@ class RestaurantCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            /// ── IMAGE ──
+            // ── IMAGE ──
             ClipRRect(
               borderRadius: const BorderRadius.horizontal(
                 left: Radius.circular(16),
@@ -45,7 +47,7 @@ class RestaurantCard extends StatelessWidget {
               child: _buildImage(restaurant.imageUrl),
             ),
 
-            /// ── DETAILS ──
+            // ── DETAILS ──
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -99,13 +101,41 @@ class RestaurantCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             restaurant.cuisineTypes.isNotEmpty
-                                ? restaurant.cuisineTypes.join(", ")
-                                : "Various cuisines",
+                                ? restaurant.cuisineTypes.join(', ')
+                                : 'Various cuisines',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 12),
                           ),
                         ),
+                        // ── DISTANCE LABEL ──
+                        if (distanceLabel != null) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F2A12).withOpacity(0.07),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.directions_walk,
+                                    size: 10, color: Color(0xFF0F2A12)),
+                                const SizedBox(width: 3),
+                                Text(
+                                  distanceLabel!,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF0F2A12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ],
@@ -113,7 +143,7 @@ class RestaurantCard extends StatelessWidget {
               ),
             ),
 
-            /// ── ARROW ──
+            // ── ARROW ──
             const Padding(
               padding: EdgeInsets.only(right: 12),
               child: Icon(Icons.chevron_right, color: Colors.grey),

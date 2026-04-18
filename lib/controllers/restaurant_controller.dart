@@ -33,7 +33,7 @@ class RestaurantController extends ChangeNotifier {
     }
   }
 
-    /// ✅ Create Restaurant + Admin
+  /// ✅ Create Restaurant + Admin
   Future<bool> createRestaurant({
     required String name,
     required String email,
@@ -58,6 +58,7 @@ class RestaurantController extends ChangeNotifier {
         email: email,
         phone: phone,
         address: address,
+        town: '',
         cuisineTypes: cuisines,
         description: description ?? '',
         imageUrl: null,
@@ -112,7 +113,6 @@ class RestaurantController extends ChangeNotifier {
     }
   }
 
-
   /// ✅ Delete restaurant + admin user
   Future<bool> deleteRestaurant(RestaurantModel restaurant) async {
     _isLoading = true;
@@ -127,7 +127,7 @@ class RestaurantController extends ChangeNotifier {
       // Step 2️⃣: Delete admin user (if exists)
       await _databaseService.deleteUser(restaurant.adminUid);
       print('✅ Deleted linked admin user');
-    
+
       Fluttertoast.showToast(
         msg: '✅ Restaurant deleted successfully!',
         backgroundColor: Colors.green,
